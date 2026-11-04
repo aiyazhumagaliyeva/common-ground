@@ -25,5 +25,6 @@ export const CONFIG = {
   NOTE_SIZE: 15,           // size of one note in 3D
   START_ZOOM: 250,        // closest the camera starts (smaller = closer)
   MAX_ZOOM: 400,          // farthest it starts, when there are many notes
+  PHOTO_NOTES_ONLY: true, // true = hide notes without a photo (typed test notes)
   SHOW_GROUP_FRAMES: false, // true = colored outline per group
 };

@@ -182,7 +182,7 @@ async function start() {
     try {
       const res = await fetch(CONFIG.SERVER_URL + "?action=approved");
       const saved = await res.json();
-      saved.forEach(s => notes.push({
+      saved.filter(s => !CONFIG.PHOTO_NOTES_ONLY || s.image).forEach(s => notes.push({
         id: "s" + s.id, text: s.text, image: s.image || null, color: s.color,
         allowReplies: s.allowReplies, group: -1, fx: rnd(), fy: rnd(), fz: rnd()
       }));
