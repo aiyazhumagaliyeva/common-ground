@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      font-family: -apple-system, "Inter", Helvetica, Arial, sans-serif;
+      background: #ffffff; color: #111; padding: 28px 22px 40px;
+      display: flex; flex-direction: column; gap: 18px; min-height: 100vh;
+    }
+    h1 { font-size: 22px; }
+    p { font-size: 16px; line-height: 1.45; color: rgba(0,0,0,0.7); }
+    .step[hidden] { display: none; }
+    .step { display: flex; flex-direction: column; gap: 14px; }
+
+    .big {
+      display: flex; align-items: center; justify-content: center;
+      height: 60px; border-radius: 12px; font-size: 17px; font-weight: 600;
+      background: #111; color: #fff; border: none; width: 100%;
+      font-family: inherit; cursor: pointer;
+    }
+    .big.light { background: #eeeeee; color: #111; }
+    input[type=file] { display: none; }
+
+    #preview { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; background: #eee; }
+    .box {
+      background: #FFF6B8; border-radius: 12px; padding: 16px;
+      font-size: 17px; line-height: 1.4;
+    }
+    .box b { display: block; margin-bottom: 4px; }
+    textarea {
+      width: 100%; min-height: 80px; border: none; outline: none; resize: none;
+      background: transparent; font: inherit;
+    }
+    .toggle { display: flex; background: #eee; border-radius: 12px; padding: 4px; }
+    .toggle button {
+      flex: 1; border: none; background: transparent; padding: 12px 6px;
+      border-radius: 9px; font: inherit; font-size: 15px; color: rgba(0,0,0,0.55);
+    }
+    .toggle button.on { background: #fff; color: #111; }
+    .small { font-size: 13px; color: rgba(0,0,0,0.45); }
+  </style>
+</head>
+<body>
+  <h1>Common Ground</h1>
+
+  <!-- 1. pick a photo -->
+  <div class="step" id="step1">
+    <p>Write <b>"I wish I could…"</b> on paper and finish the sentence. Then add a photo of it.</p>
+    <label class="big" for="camera">Take a photo</label>
+    <input type="file" id="camera" accept="image/*" capture="environment">
+    <label class="big light" for="gallery">Choose from my photos</label>
+    <input type="file" id="gallery" accept="image/*">
+    <p class="small">No names or accounts. Hidden photo data (like location) is removed before sending. Every note is reviewed by a person before it appears.</p>
+  </div>
+
+  <!-- 2. confirm -->
+  <div class="step" id="step2" hidden>
+    <img id="preview" alt="Your note">
+    <p id="reading">Reading your handwriting…</p>
+    <div class="box">
+      <b>I wish I could</b>
+      <textarea id="text" placeholder="what your note says"></textarea>
+    </div>
+    <p class="small">Fix anything the AI misread. This text helps place your note near similar ones.</p>
+    <div class="toggle">
+      <button id="open" class="on">Open to responses</button>
+      <button id="share">Just sharing</button>
+    </div>
+    <button class="big" id="send">Send</button>
+    <button class="big light" id="redo">Use a different photo</button>
+  </div>
+
+  <!-- 3. done -->
+  <div class="step" id="step3" hidden>
+    <h1>Sent.</h1>
+    <p>Look at the screen. Your note will appear for everyone after it's reviewed.</p>
+  </div>
+
+  <!-- support (self-harm) -->
+  <div class="step" id="support" hidden>
+    <h1>Your note won't be posted.</h1>
+    <p>It sounds like you might be carrying something heavy. You don't have to handle it alone.</p>
+    <p>If you're thinking about suicide or hurting yourself, you can call or text <b>988</b> (US, any time) to talk to someone. Outside the US: findahelpline.com</p>
+    <p>Common Ground isn't a support service, but the people at 988 are.</p>
+  </div>
+
+  <script>
+    const SESSION = "<?= session ?>";
+    const $ = id => document.getElementById(id);
+    let thumb = "", allowReplies = true;
+
+    function show(id) { ["step1","step2","step3","support"].forEach(s => $(s).hidden = s !== id); }
+
+    async function handle(file) {
+      if (!file) return;
+      show("step2");
+      $("reading").textContent = "Reading your handwriting…";
+      $("text").value = "";
+      // redrawing on a canvas removes hidden data (GPS location etc.)
+      const bmp = await createImageBitmap(file);
+      const big = draw(bmp, 1400, false);
+      const small = draw(bmp, 320, true);
+      thumb = small.toDataURL("image/jpeg", 0.7);
+      if (thumb.length > 48000) thumb = small.toDataURL("image/jpeg", 0.5);
+      $("preview").src = thumb;
+      const b64 = big.toDataURL("image/jpeg", 0.85).split(",")[1];
+      google.script.run
+        .withSuccessHandler(t => {
+          $("text").value = t;
+          $("reading").textContent = t ? "Is this what it says?" : "Couldn't read it. Type what it says:";
+        })
+        .withFailureHandler(() => { $("reading").textContent = "Couldn't read it. Type what it says:"; })
+        .readPhoto(b64);
+    }
+
+    function draw(bmp, max, square) {
+      const c = document.createElement("canvas"), x = c.getContext("2d");
+      if (square) {
+        const s = Math.min(bmp.width, bmp.height);
+        c.width = c.height = max;
+        x.drawImage(bmp, (bmp.width - s) / 2, (bmp.height - s) / 2, s, s, 0, 0, max, max);
+      } else {
+        const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+        c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+        x.drawImage(bmp, 0, 0, c.width, c.height);
+      }
+      return c;
+    }
+
+    $("camera").onchange = e => handle(e.target.files[0]);
+    $("gallery").onchange = e => handle(e.target.files[0]);
+    $("redo").onclick = () => { $("camera").value = ""; $("gallery").value = ""; show("step1"); };
+    $("open").onclick = () => { allowReplies = true; $("open").classList.add("on"); $("share").classList.remove("on"); };
+    $("share").onclick = () => { allowReplies = false; $("share").classList.add("on"); $("open").classList.remove("on"); };
+
+    $("send").onclick = () => {
+      const text = $("text").value.trim();
+      if (!text) { $("reading").textContent = "Please type what your note says first."; return; }
+      $("send").disabled = true; $("send").textContent = "Sending…";
+      google.script.run
+        .withSuccessHandler(r => show(r.flag === "self-harm" ? "support" : "step3"))
+        .withFailureHandler(() => { $("send").disabled = false; $("send").textContent = "Try again"; })
+        .saveNote({ text, image: thumb, allowReplies, session: SESSION });
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Common Ground</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* ---------- RESET: makes CSS count sizes like Figma ---------- */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+    }
+    body {
+      font-family: Inter, sans-serif;
+      background-color: #ffffff;
+    }
+
+    /* ---------- MAP (back layer, full screen, shifted left) ---------- */
+    #map {
+      position: fixed;
+      top: 0;
+      left: 0;               /* centered (was -15vw to make room for the sidebar) */
+    }
+
+    /* ---------- SIDEBAR (glass layer on top) = vertical auto layout ---------- */
+    #sidebar {
+      position: fixed;
+      top: 40px;
+      bottom: 40px;
+      right: 40px;
+      width: 30vw;
+      min-width: 360px;
+      z-index: 1;
+      padding: 32px;
+      border-radius: 20px;
+      background: rgba(161, 161, 161, 0.17);
+      backdrop-filter: blur(10px) saturate(120%);
+      -webkit-backdrop-filter: blur(10px) saturate(120%);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.04),
+        inset 0 1px 0 rgba(255, 255, 255, 0.17);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;             /* space between header, writeBox, toolbar */
+    }
+    #header {
+      font-size: 20px;
+      font-weight: 500;
+      margin-bottom: 24px;   /* extra space only under the header */
+    }
+
+    /* ---------- WRITE BOX: label floats on top of the textarea ---------- */
+    #writeBox {
+      position: relative;    /* reference frame for the label */
+      background: #7BB8FF;   /* changed by the color button (JS) */
+      border-radius: 10px;
+      padding: 20px;
+      transition: background 0.2s;
+    }
+    #writeBox:focus-within {
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);  /* quiet focus sign */
+    }
+    #prefix {
+      position: absolute;    /* "ignore auto layout" */
+      top: 20px;             /* = writeBox padding */
+      left: 20px;
+      font-weight: 700;
+      line-height: 1.4;
+      pointer-events: none;  /* clicks go through to the textarea */
+    }
+    textarea {
+      display: block;
+      width: 100%;
+      height: 120px;
+      padding: 0;
+      border: none;
+      outline: none;         /* removes focus ring */
+      resize: none;          /* removes the // corner */
+      background: none;
+      font: inherit;
+      font-size: 16px;
+      line-height: 1.4;
+      text-indent: 118px;    /* first line starts after "I wish I could" */
+    }
+    textarea::placeholder { color: rgba(0, 0, 0, 0.4); }
+
+    /* ---------- TOOLBAR = horizontal auto layout, space between ---------- */
+    #toolbar {
+      display: flex;
+      justify-content: space-between;  /* tools left, Send right */
+      align-items: center;
+    }
+    #tools {
+      display: flex;
+      gap: 22px;             /* space between the two button groups */
+    }
+    #TextColor {
+      display: flex;
+      gap: 9px;              /* T + color */
+    }
+    #privatepublic {
+      display: flex;
+      gap: 0;                /* globe + lock touch */
+    }
+
+    /* every icon button shares this = like a Figma component */
+    .iconButton {
+      width: 36px;
+      height: 36px;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      background-color: #cecece;
+      cursor: pointer;
+    }
+    .iconButton img {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    /* only the different parts get their own rule */
+    #PublicMode  { border-radius: 6px 0 0 6px; }
+    #PrivateMode { border-radius: 0 6px 6px 0; }
+    .iconButton.selected { background-color: #ffffff; }   /* the active mode */
+
+    #colorPicker {
+      width: 36px;
+      height: 36px;
+      border: 2px solid #ffffff;
+      border-radius: 6px;
+      background: #7BB8FF;
+      cursor: pointer;
+    }
+
+    #sendButton {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 6px;
+      background: #cecece;
+      font: inherit;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    #sendButton:hover { background: #bdbdbd; }
+
+    /* ---------- MESSAGE after sending ---------- */
+    #status {
+      font-size: 13px;
+      color: rgba(0, 0, 0, 0.55);
+      min-height: 18px;
+    }
+
+    /* ---------- TABS: write / photo ---------- */
+    #tabs { display: flex; gap: 6px; }
+    .tab {
+      padding: 7px 14px; border: none; border-radius: 6px;
+      background: transparent; font: inherit; font-size: 14px;
+      color: rgba(0,0,0,0.55); cursor: pointer;
+    }
+    .tab.active { background: #ffffff; color: #111; }
+
+    /* ---------- PHOTO ---------- */
+    #photoBox { display: flex; flex-direction: column; gap: 10px; }
+    #photoBox[hidden] { display: none; }
+    #photoButton {
+      display: flex; align-items: center; justify-content: center;
+      height: 64px; border: 1.5px dashed rgba(0,0,0,0.25); border-radius: 10px;
+      font-size: 14px; color: rgba(0,0,0,0.6); cursor: pointer;
+    }
+    #photoButton:hover { background: rgba(255,255,255,0.4); }
+    #photoInput { display: none; }
+    #photoPreview { width: 120px; height: 120px; object-fit: cover; border-radius: 8px; }
+
+    #composer { display: flex; flex-direction: column; gap: 10px; }
+    #composer[hidden] { display: none; }
+    #modeNote { font-size: 12px; color: rgba(0,0,0,0.45); }
+
+    /* ---------- SELECTED NOTE ---------- */
+    #selected {
+      margin-top: auto;                /* pushes it to the bottom of the sidebar */
+      padding: 18px; border-radius: 10px; background: rgba(255,255,255,0.7);
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    #selected[hidden] { display: none; }
+    #selectedText { font-size: 16px; line-height: 1.4; }
+    #selectedMeta { font-size: 12px; color: rgba(0,0,0,0.5); }
+
+    /* ---------- SUPPORT (self-harm) ---------- */
+    #support {
+      padding: 22px; border-radius: 10px; background: #ffffff;
+      display: flex; flex-direction: column; gap: 12px; line-height: 1.45;
+    }
+    #support[hidden] { display: none; }
+    #support a { color: #2557A7; }
+    #supportBack { align-self: flex-start; }
+
+    /* ---------- NOTES-ONLY VIEW: delete these 2 lines to bring the sidebar back ---------- */
+    #sidebar { display: none !important; }
+    #mapInfo:not(.problem) { display: none; }
+
+    #mapInfo {
+      position: fixed; left: 24px; bottom: 20px; z-index: 1;
+      font-size: 12px; color: rgba(0,0,0,0.45);
+    }
+
+    /* ============================================================
+       SCALE: every size below is "Figma px × --k".
+       --k = how big 1 Figma px is on this screen, so the layout
+       keeps its proportions (design frame = 1512 × 982).
+       ============================================================ */
+    :root { --k: min(calc(100vw / 1512), calc(100vh / 982)); }
+
+    /* ---------- NAV PILL (Figma: home-new) ---------- */
+    #nav {
+      position: fixed; z-index: 5; left: 50%; transform: translateX(-50%);
+      top: max(16px, calc(56 * var(--k)));
+      display: flex; align-items: center; gap: max(10px, calc(15 * var(--k)));
+      padding: max(7px, calc(10 * var(--k))) max(20px, calc(30 * var(--k)));
+      border: 1px solid #000; border-radius: 40px;
+      background: rgba(132, 132, 132, 0.1);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      font-family: Helvetica, Arial, sans-serif; font-size: max(13px, calc(16 * var(--k))); color: #000;
+      transition: top 0.45s ease;
+    }
+    body.page-open #nav { top: -80px; }                     /* slides away on pages */
+    #nav .brand { font-family: Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: max(16px, calc(20 * var(--k))); white-space: nowrap; }
+    #nav .divider { width: 2px; height: max(14px, calc(19 * var(--k))); display: block; }
+    #nav .links { display: flex; align-items: center; gap: max(14px, calc(21 * var(--k))); }
+    #nav button { all: unset; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 7px; }
+    #nav button:hover { color: rgba(0, 0, 0, 0.7); }       /* hover = Figma variant 4/5/6 */
+    #nav .camera { width: max(16px, calc(20 * var(--k))); height: auto; display: block; }
+    #nav .camera.hover { display: none; }
+    #navAdd:hover .camera { display: none; }
+    #navAdd:hover .camera.hover { display: block; }
+
+    /* ---------- FULL PAGES (Add a note, About, Contact) ---------- */
+    .page {
+      position: fixed; inset: 0; z-index: 4; background: #fff;
+      overflow-y: auto; font-family: Helvetica, Arial, sans-serif; color: #000;
+      opacity: 0; pointer-events: none; transition: opacity 0.35s ease;
+    }
+    .page.open { opacity: 1; pointer-events: auto; }
+    .page .back {
+      all: unset; cursor: pointer; position: fixed; z-index: 1;
+      left: max(16px, calc(42 * var(--k))); top: max(16px, calc(33 * var(--k)));
+    }
+    .page .back img { width: max(32px, calc(40 * var(--k))); height: auto; display: block; }
+    .page .back:hover { opacity: 0.6; }
+    .page h1 {
+      font-weight: 400; text-align: center; line-height: normal;
+      font-size: max(22px, calc(32 * var(--k)));
+      margin-top: calc(73 * var(--k));
+    }
+
+    /* ---------- ADD A NOTE (Figma: add yours-new) ---------- */
+    .steps {
+      width: min(calc(1272 * var(--k)), 92vw); margin: calc(86 * var(--k)) auto calc(60 * var(--k));
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      column-gap: calc(40 * var(--k)); row-gap: calc(54 * var(--k));
+      align-items: start;
+    }
+    .step { display: flex; flex-direction: column; align-items: center; }
+    .step .num {
+      align-self: flex-start; width: max(26px, calc(34 * var(--k))); aspect-ratio: 1;
+      border: 1px solid #000; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: max(15px, calc(20 * var(--k)));
+    }
+    .step img { height: calc(184 * var(--k)); width: auto; max-width: 100%; object-fit: contain; }
+    .step p {
+      text-align: center; text-wrap: pretty; line-height: normal; margin-top: calc(20 * var(--k));
+      font-size: max(14px, calc(20 * var(--k))); max-width: calc(400 * var(--k));
+    }
+    .qrCard { display: flex; flex-direction: column; align-items: center; gap: calc(17 * var(--k)); align-self: center; }
+    .qrCard .box {
+      width: calc(304 * var(--k)); aspect-ratio: 304 / 295; border-radius: calc(40 * var(--k));
+      background: #d9d9d9; overflow: hidden; display: flex; flex-direction: column;
+    }
+    .qrCard .bar { height: calc(69 * var(--k)); background: #c4c4c4; flex-shrink: 0; }
+    .qrCard .inner { flex: 1; display: flex; align-items: center; justify-content: center; padding: calc(16 * var(--k)); text-align: center; }
+    #qr { width: calc(180 * var(--k)) !important; height: calc(180 * var(--k)) !important; background: #fff; border-radius: calc(10 * var(--k)); padding: calc(8 * var(--k)); }
+    .qrCard .caption { font-size: max(13px, calc(16 * var(--k))); text-align: center; }
+    #addStatus { font-size: max(12px, calc(14 * var(--k))); color: rgba(0,0,0,0.55); text-align: center; min-height: 1.2em; }
+    #addDone { display: flex; flex-direction: column; gap: calc(12 * var(--k)); font-size: max(14px, calc(18 * var(--k))); }
+    #addDone[hidden] { display: none; }
+    #addDone button {
+      all: unset; cursor: pointer; align-self: center; margin-top: calc(6 * var(--k));
+      padding: calc(8 * var(--k)) calc(18 * var(--k)); border: 1px solid #000; border-radius: 40px;
+      font-size: max(13px, calc(16 * var(--k)));
+    }
+
+    /* ---------- ABOUT / CONTACT (Figma: about) ---------- */
+    .prose {
+      width: min(calc(605 * var(--k)), 88vw); margin: calc(64 * var(--k)) auto calc(80 * var(--k));
+      font-size: max(15px, calc(20 * var(--k))); line-height: normal;
+    }
+    .prose p { margin-bottom: 1.2em; text-wrap: balance; }
+    .prose a { color: inherit; }
+
+    /* ---------- PHONES / NARROW SCREENS ---------- */
+    @media (max-width: 800px) {
+      :root { --k: calc(100vw / 800); }
+      .steps { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 520px) {
+      .steps { grid-template-columns: 1fr; }
+      .page h1 { margin-top: 72px; padding: 0 16px; font-size: 22px; }
+      #nav .brand { display: none; }
+      #nav .divider:first-of-type { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="mapInfo"></div>
+
+  <!-- ---------- NAV PILL ---------- -->
+  <nav id="nav">
+    <span class="brand">Common Ground</span>
+    <img class="divider" src="icons/divider-thin.svg" alt="">
+    <button id="navAdd">Add a note
+      <img class="camera" src="icons/camera.svg" alt="">
+      <img class="camera hover" src="icons/camera-hover.svg" alt="">
+    </button>
+    <img class="divider" src="icons/divider-thin.svg" alt="">
+    <div class="links">
+      <button id="navAbout">About</button>
+      <button id="navContact">Contact Us</button>
+    </div>
+  </nav>
+
+  <!-- ---------- ADD A NOTE ---------- -->
+  <section class="page" id="addPage" aria-label="Add a note">
+    <button class="back" data-close aria-label="Back to the board"><img src="icons/back.svg" alt=""></button>
+    <h1>How to contribute to Common Ground</h1>
+    <div class="steps">
+      <div class="step">
+        <span class="num">1</span>
+        <img src="illustrations/step1.png" alt="A sticky note pad and a hand drawing a square on paper">
+        <p>Draw a square on the paper, or use a sticky note.</p>
+      </div>
+      <div class="step">
+        <span class="num">2</span>
+        <img src="illustrations/step2.png" alt="A note that starts with “I wish I could…”">
+        <p>Inside the square, write “I wish I could” and complete the sentence. Please don’t include names or contact information in your note.</p>
+      </div>
+      <div class="step">
+        <span class="num">3</span>
+        <img src="illustrations/step3.png" alt="A phone scanning a QR code">
+        <p>Scan the QR code with your phone camera to take a photo of your note, or upload one from your gallery.</p>
+      </div>
+      <div class="step">
+        <span class="num">4</span>
+        <img src="illustrations/step4.png" alt="A phone taking a photo of a note">
+        <p>Make sure the whole note is inside the photo, with as little background as possible.</p>
+      </div>
+      <div class="step">
+        <span class="num">5</span>
+        <img src="illustrations/step5.png" alt="A phone showing the note with two buttons">
+        <p>Check if we captured the text from your note accurately.</p>
+      </div>
+      <div class="qrCard">
+        <div class="box">
+          <div class="bar"></div>
+          <div class="inner">
+            <canvas id="qr"></canvas>
+            <div id="addDone" hidden>
+              <b>Thank you. Your note has been submitted.</b>
+              <span>It will appear for everyone after review.</span>
+              <button id="seeNote">See it on the board</button>
+            </div>
+          </div>
+        </div>
+        <p class="caption" id="qrCaption">Scan with your phone camera</p>
+        <p id="addStatus"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------- ABOUT ---------- -->
+  <section class="page" id="aboutPage" aria-label="About">
+    <button class="back" data-close aria-label="Back to the board"><img src="icons/back.svg" alt=""></button>
+    <h1>About Common Ground</h1>
+    <div class="prose">
+      <p>Common Ground is an anonymous online board of handwritten notes. Every note finishes the same sentence: “I wish I could…”<br>People write their wish by hand, take a photo, and upload it by scanning a QR code. There are no names, no likes, and no followers.</p>
+      <p>Each note becomes a point on a shared map. Notes about similar things end up close to each other, so groups form on their own as more people add theirs. Zoom in to read one person’s wish. Zoom out to see what people have in common.</p>
+      <p>While working on my thesis, I was curious about how people interact with technology. Over time, the question turned into how people interact with each other through technology.</p>
+      <p>Inspired by works like “Before I Die” by Candy Chang and “This Exquisite Forest” by Aaron Koblin and Chris Milk, I wanted to make a space where people can connect anonymously over the same things, or just share their thoughts. Together, the notes build a collection of what people usually keep to themselves.</p>
+      <p>The project started by collecting handwritten responses on sticky notes. I then designed the website in Figma and built it with HTML, CSS, and JavaScript, using a 3D graph library to place the notes in space. AI reads each note’s handwriting and wording, then places it near notes with a similar meaning.</p>
+      <p>Built by Aiya, a Communication Design student at Parsons School of Design, based in Brooklyn, NYC. She grew up practicing fine art and now works at the meeting point of design and code. See more of her work at <a href="https://aiyazhumagaliyeva.com" target="_blank" rel="noopener">aiyazhumagaliyeva.com</a></p>
+    </div>
+  </section>
+
+  <!-- ---------- CONTACT ---------- -->
+  <section class="page" id="contactPage" aria-label="Contact Us">
+    <button class="back" data-close aria-label="Back to the board"><img src="icons/back.svg" alt=""></button>
+    <h1>Contact Us</h1>
+    <div class="prose">
+      <p>Questions, or want a note removed? Write to <a href="#">[add your email]</a>.</p>
+    </div>
+  </section>
+
+  <div id="sidebar">
+    <div id="header">Common Ground</div>
+
+    <div id="composer">
+      <div id="tabs">
+        <button class="tab active" id="tabWrite">Write</button>
+        <button class="tab" id="tabPhoto">Photo of a note</button>
+      </div>
+
+      <div id="photoBox" hidden>
+        <label id="photoButton" for="photoInput">Take or upload a photo of your note</label>
+        <input type="file" id="photoInput" accept="image/*" capture="environment">
+        <img id="photoPreview" alt="Your note" hidden>
+      </div>
+
+      <div id="writeBox">
+        <label for="wishInput" id="prefix">I wish I could</label>
+        <textarea id="wishInput" placeholder="finish the sentence"></textarea>
+      </div>
+
+      <div id="toolbar">
+        <div id="tools">
+          <div id="TextColor">
+            <button class="iconButton" id="TextChange" title="Text style">
+              <img src="text.svg" alt="Text style">
+            </button>
+            <button id="colorPicker" title="Note color" aria-label="Note color"></button>
+          </div>
+          <div id="privatepublic">
+            <button class="iconButton selected" id="PublicMode" title="Open to responses">
+              <img src="world.svg" alt="Open to responses">
+            </button>
+            <button class="iconButton" id="PrivateMode" title="Just sharing">
+              <img src="lock.svg" alt="Just sharing">
+            </button>
+          </div>
+        </div>
+        <button id="sendButton">Send</button>
+      </div>
+
+      <p id="status"></p>
+      <p id="modeNote" hidden>Demo mode: notes aren't saved and photos aren't read by AI yet. See SETUP.md.</p>
+    </div>
+
+    <div id="support" hidden>
+      <strong>Your note won't be posted.</strong>
+      <p>It sounds like you might be carrying something heavy. You don't have to handle it alone.</p>
+      <p>If you're thinking about suicide or hurting yourself, you can call or text <strong>988</strong> (US, any time) to talk to someone. Outside the US: <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a>.</p>
+      <p>Common Ground isn't a support service, but the people at 988 are.</p>
+      <button class="tab active" id="supportBack">Back</button>
+    </div>
+
+    <div id="selected" hidden>
+      <div id="selectedText"></div>
+      <div id="selectedMeta"></div>
+    </div>
+  </div>
+
+  <!-- shows problems on the page itself, bottom left -->
+  <script>
+    function showProblem(msg) { const el = document.getElementById("mapInfo"); el.classList.add("problem"); el.textContent = "Problem: " + msg; }
+    window.addEventListener("error", e => showProblem((e.message || "a file failed to load") + (e.filename ? " (" + e.filename.split("/").pop() + ")" : "")), true);
+    window.addEventListener("unhandledrejection", e => showProblem(String(e.reason && e.reason.message || e.reason)));
+    setTimeout(() => { if (!window.appStarted) showProblem("the code didn't start. Is the js folder next to index.html?"); }, 6000);
+  </script>
+  <script type="module">
+    // load the app and show the real error on the page if it fails
+    import("./js/app.js").catch(e => showProblem(e.message || String(e)));
+  </script>
+</body>
+</html>
