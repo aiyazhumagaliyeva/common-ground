@@ -148,6 +148,18 @@ function regroup() {
     : `${notes.length} wishes · ${count} groups have formed`;
 }
 
+// start zoom depends on how many notes there are:
+// few notes → START_ZOOM (close), many notes → farther, up to MAX_ZOOM
+function fitCamera() {
+  const r = Math.max(...notes.map(n => Math.hypot(n.tx || 0, n.ty || 0, n.tz || 0))) + CONFIG.NOTE_SIZE;
+  const fov = (graph.camera().fov * Math.PI) / 180;               // vertical field of view
+  const aspect = window.innerWidth / window.innerHeight;
+  const fitV = r / Math.tan(fov / 2);                              // fit top-to-bottom
+  const fitH = r / (Math.tan(fov / 2) * aspect);                   // fit left-to-right
+  const z = Math.min(CONFIG.MAX_ZOOM, Math.max(CONFIG.START_ZOOM, Math.max(fitV, fitH) * 1.1));
+  graph.cameraPosition({ x: 0, y: 0, z }, { x: 0, y: 0, z: 0 }, 1200);
+}
+
 function flyTo(node) {
   const dist = 45, r = Math.hypot(node.tx, node.ty, node.tz) || 1;
   const k = 1 + dist / r;
@@ -181,6 +193,7 @@ async function start() {
     const vecs = await embed(notes.map(n => n.text));
     notes.forEach((n, i) => (n.vec = vecs[i]));
     regroup();
+    fitCamera();
   } catch (e) {
     console.error(e);
     $("mapInfo").textContent = "Could not load the AI model (check internet). Notes stay in the middle.";

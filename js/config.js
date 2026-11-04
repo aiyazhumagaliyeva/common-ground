@@ -22,7 +22,8 @@ export const CONFIG = {
   GROUP_DISTANCE: 40,    // how far groups sit from the middle
   GROUP_SPACING: 100,     // minimum distance between two groups
   GROUP_SPREAD: 40,       // how loose each group is
-  NOTE_SIZE: 14,           // size of one note in 3D
-  START_ZOOM: 200,        // camera distance at start (smaller = closer)
+  NOTE_SIZE: 15,           // size of one note in 3D
+  START_ZOOM: 250,        // closest the camera starts (smaller = closer)
+  MAX_ZOOM: 400,          // farthest it starts, when there are many notes
   SHOW_GROUP_FRAMES: false, // true = colored outline per group
 };
