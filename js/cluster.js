@@ -11,6 +11,7 @@
 // ============================================================
 
 import { CONFIG } from './config.js';
+import { SEED_VECTORS } from './seed-vectors.js';
 
 // The AI library loads only when needed, so the map still shows if it fails.
 let extractor = null;
@@ -29,8 +30,35 @@ function core(text) {
 export async function embed(texts) {
   await loadModel();
   const out = await extractor(texts.map(core), { pooling: 'mean', normalize: true });
-  return out.tolist();
+  const vecs = out.tolist();
+  texts.forEach((t, i) => remember(t, vecs[i]));
+  return vecs;
 }
+
+// ---------- FAST START: vectors we already know ----------
+// The AI model is ~24 MB, so the map never waits for it.
+// Starting notes have pre-computed vectors (seed-vectors.js);
+// other notes are remembered on this device after the first time.
+const SCALE = 0.35 / 127;
+function decode(b64) {
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const v = Array.from(new Int8Array(bytes.buffer), x => x * SCALE);
+  const L = Math.sqrt(v.reduce((s, x) => s + x * x, 0)) || 1;
+  return v.map(x => x / L);
+}
+function encode(v) {
+  const q = Int8Array.from(v, x => Math.max(-127, Math.min(127, Math.round(x / SCALE))));
+  return btoa(String.fromCharCode(...new Uint8Array(q.buffer)));
+}
+function remember(text, v) {
+  try { localStorage.setItem("cg:vec:" + text, encode(v)); } catch (e) {}
+}
+export function knownVector(text) {
+  if (SEED_VECTORS[text]) return decode(SEED_VECTORS[text]);
+  try { const s = localStorage.getItem("cg:vec:" + text); if (s) return decode(s); } catch (e) {}
+  return null;
+}
+export const modelReady = () => !!extractor;
 
 // ---------- small vector helpers ----------
 const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };

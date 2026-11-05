@@ -23,14 +23,24 @@
     table { width: 100%; border-collapse: collapse; margin-top: 40px; font-size: 13px; }
     td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid #eee; }
     th { color: rgba(0,0,0,0.55); font-weight: 400; }
-    @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+    h2 { font-size: 18px; font-weight: 400; margin: 40px 0 4px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+    input[type=range] { padding: 0; border: 0; accent-color: #111; }
+    input[type=color] { padding: 4px; height: 46px; }
+    .check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #111; margin-top: 18px; }
+    .check input { width: auto; }
+    aside { position: sticky; top: 24px; align-self: start; }
+    .stat { display: flex; justify-content: space-between; font-size: 13px; margin-top: 12px; color: rgba(0,0,0,0.6); }
+    #scan.ok { color: #157a3c; } #scan.bad { color: #b42318; }
+    pre { margin-top: 12px; font-size: 11px; background: #f2f2f2; border-radius: 12px; padding: 12px; white-space: pre-wrap; display: none; }
+    @media (max-width: 760px) { main { grid-template-columns: 1fr; } aside { position: static; } }
   </style>
 </head>
 <body>
 <main>
   <section>
     <h1>QR & link maker</h1>
-    <p class="lead">Every poster and post gets its own code, so the "events" tab in your Sheet shows where each visitor came from. Only for you; this page isn't linked anywhere.</p>
+    <p class="lead">Every poster and post gets its own code, so the "events" tab in your Sheet shows where each visitor came from. Below, you can change how the QR looks. Only for you; this page isn't linked anywhere.</p>
 
     <label for="type">Where will people see it?</label>
     <select id="type">
@@ -59,6 +69,48 @@
     <div class="out"><b>Source code it will show up as</b><span id="code"></span></div>
     <div class="buttons"><button id="copy">Copy link</button></div>
 
+    <h2>Look of the QR</h2>
+    <p class="hint">Changes show on the right. The check under the preview tells you if it still scans.</p>
+
+    <label for="ecc">Number of dots (error correction)</label>
+    <select id="ecc">
+      <option value="L">Fewest dots (L): best for screens and clean prints</option>
+      <option value="M">A few more (M): safer for street posters</option>
+      <option value="Q">More (Q)</option>
+      <option value="H">Most (H): survives the most damage</option>
+    </select>
+    <p class="hint">The biggest change is a shorter link: a short domain (like a .xyz) gives a much calmer code.</p>
+
+    <div class="row">
+      <div><label for="shape">Dot shape</label>
+        <select id="shape">
+          <option value="blob">Melted dots</option>
+          <option value="dots">Separate dots</option>
+          <option value="rounded">Rounded squares</option>
+          <option value="squares">Squares</option>
+        </select></div>
+      <div><label for="finder">Corner squares</label>
+        <select id="finder">
+          <option value="rounded">Rounded</option>
+          <option value="circle">Circles</option>
+          <option value="square">Square</option>
+        </select></div>
+    </div>
+    <label for="dot">Dot size <span id="dotVal"></span></label>
+    <input id="dot" type="range" min="0.6" max="1" step="0.02">
+    <label for="finderRadius">Corner roundness</label>
+    <input id="finderRadius" type="range" min="0" max="3.5" step="0.1">
+    <label for="quiet">Empty margin</label>
+    <input id="quiet" type="range" min="1" max="5" step="0.5">
+    <div class="row">
+      <div><label for="ink">Color</label><input id="ink" type="color"></div>
+      <div><label for="paper">Background</label><input id="paper" type="color"></div>
+    </div>
+    <label class="check"><input id="clear" type="checkbox"> No background (transparent)</label>
+    <label class="check"><input id="brackets" type="checkbox"> Corner brackets</label>
+    <div class="buttons"><button id="useSite">Use this look on the website</button><button id="reset">Reset</button></div>
+    <pre id="snippet"></pre>
+
     <table id="log"><tr><th>Saved codes on this computer</th><th></th></tr></table>
   </section>
 
@@ -68,12 +120,14 @@
       <button class="primary" id="svg">Download SVG (for print)</button>
       <button id="png">Download PNG</button>
     </div>
-    <p class="hint">Test-scan every printed QR with 2 phones before putting it up.</p>
+    <div class="stat"><span id="size"></span><span id="scan"></span></div>
+    <p class="hint">Still test-scan every printed QR with 2 phones before putting it up.</p>
   </aside>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script type="module">
-  import { drawQR } from './js/qr.js';
+  import { drawQR, QR_STYLE } from './js/qr.js';
   const $ = id => document.getElementById(id);
   const BASE = location.origin + location.pathname.replace(/make-qr\.html$/, "");
 
@@ -84,14 +138,68 @@
     const link = BASE + $("target").value + "?src=" + code;
     return { code, link };
   }
+  let checkId = 0;
+  // ---- look ----
+  const KEYS = ["ecc", "shape", "finder", "dot", "finderRadius", "quiet", "ink", "paper", "brackets"];
+  let look;
+  try { look = { ...QR_STYLE, ...JSON.parse(localStorage.getItem("cg:qrlook") || "{}") }; } catch (e) { look = { ...QR_STYLE }; }
+  function fill() {
+    KEYS.forEach(k => {
+      const el = $(k);
+      if (k === "brackets") el.checked = look.brackets;
+      else if (k === "paper") { $("clear").checked = look.paper === "transparent"; el.value = look.paper === "transparent" ? "#ffffff" : look.paper; }
+      else el.value = look[k];
+    });
+  }
+  function readLook() {
+    look = {
+      ...look, ecc: $("ecc").value, shape: $("shape").value, finder: $("finder").value,
+      dot: +$("dot").value, finderRadius: +$("finderRadius").value, quiet: +$("quiet").value,
+      ink: $("ink").value, paper: $("clear").checked ? "transparent" : $("paper").value, brackets: $("brackets").checked
+    };
+    try { localStorage.setItem("cg:qrlook", JSON.stringify(look)); } catch (e) {}
+  }
+  fill();
+
   function update() {
     const { code, link } = current();
     $("link").textContent = link;
     $("code").textContent = code;
-    drawQR($("qr"), link, { quiet: 2 });
+    $("dotVal").textContent = "(" + look.dot + ")";
+    const n = drawQR($("qr"), link, look);
+    $("size").textContent = `${n} × ${n} dots`;
+    checkScan(link);
   }
   ["type", "place", "target"].forEach(id => $(id).addEventListener("input", update));
+  [...KEYS, "clear"].forEach(id => $(id).addEventListener("input", () => { readLook(); update(); }));
+  $("reset").onclick = () => { look = { ...QR_STYLE }; try { localStorage.removeItem("cg:qrlook"); } catch (e) {} fill(); update(); };
   update();
+
+  // does it still scan? draw it small (like a phone camera would see it) and try to read it
+  function checkScan(link) {
+    const id = ++checkId, svg = $("qr").querySelector("svg").outerHTML;
+    const img = new Image();
+    img.onload = () => {
+      if (id !== checkId || !window.jsQR) return;
+      const S = 400, c = document.createElement("canvas"); c.width = c.height = S;
+      const g = c.getContext("2d", { willReadFrequently: true });
+      g.fillStyle = look.paper === "transparent" ? "#fff" : look.paper; g.fillRect(0, 0, S, S);
+      g.drawImage(img, 0, 0, S, S);
+      const r = jsQR(g.getImageData(0, 0, S, S).data, S, S);
+      const ok = r && r.data === link;
+      $("scan").textContent = ok ? "✓ Scans" : "✗ Won't scan, change the look";
+      $("scan").className = ok ? "ok" : "bad";
+    };
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  }
+
+  // settings to paste into js/qr.js (QR_STYLE) for the QR on the website
+  $("useSite").onclick = async () => {
+    const out = "  " + KEYS.map(k => `${k}: ${JSON.stringify(look[k])},`).join("\n  ");
+    $("snippet").style.display = "block";
+    $("snippet").textContent = "Copied. Paste these lines into QR_STYLE in js/qr.js (or send them to Claude):\n\n" + out;
+    try { await navigator.clipboard.writeText(out); } catch (e) {}
+  };
 
   // remember made codes (on this computer only)
   function saved() { try { return JSON.parse(localStorage.getItem("cg:codes") || "[]"); } catch (e) { return []; } }

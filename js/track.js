@@ -5,7 +5,7 @@
 //  - What they did: a short list of events (opened a note, opened Add a note…)
 //  - Saved to your Google Sheet, "events" tab. No names, no IP, no exact location.
 //  - Heatmaps / cursor recordings: Microsoft Clarity (only if CLARITY_ID is set).
-//  - Nothing is recorded until the visitor says OK to the notice.
+//  - No popup. The About page explains it and has a "Don't count my visits" button.
 // ============================================================
 import { CONFIG } from './config.js';
 
@@ -52,9 +52,14 @@ if (!visit) { visit = rid(); store("session", "cg:sid", visit); }
 const device = /Mobi|Android|iPhone/i.test(navigator.userAgent) ? "phone"
              : /iPad|Tablet/i.test(navigator.userAgent) ? "tablet" : "desktop";
 
-// ---- consent ----
-export function consent() { return store("local", "cg:consent"); }   // "yes" | "no" | null
-const enabled = () => CONFIG.TRACKING && consent() === "yes" && CONFIG.SERVER_URL;
+// ---- opt-out (no popup: visits count unless someone opts out on the About page) ----
+export function optedOut() { return store("local", "cg:optout") === "1"; }
+export function optOut() {
+  store("local", "cg:optout", "1");
+  queue = [];
+  if (window.clarity) window.clarity("consent", false);
+}
+const enabled = () => CONFIG.TRACKING && !optedOut() && CONFIG.SERVER_URL;
 
 // ---- sending: events are grouped and sent every few seconds ----
 let queue = [];
@@ -92,40 +97,12 @@ function loadClarity() {
   window.clarity("set", "source", src);              // so you can filter recordings by source
 }
 
-// ---- start: show the notice once, then track if allowed ----
+// ---- start ----
 export function startTracking(pageName) {
-  if (!CONFIG.TRACKING) return;
-  const go = () => {
-    loadClarity();
-    track("page_view", {
-      page: pageName, referrer: document.referrer ? new URL(document.referrer).hostname : "",
-      screen: `${screen.width}x${screen.height}`, lang: navigator.language
-    });
-  };
-  if (consent() === "yes") return go();
-  if (consent() === "no") return;
-  showNotice(answer => {
-    store("local", "cg:consent", answer);
-    if (answer === "yes") go();
+  if (!CONFIG.TRACKING || optedOut()) return;
+  loadClarity();
+  track("page_view", {
+    page: pageName, referrer: document.referrer ? new URL(document.referrer).hostname : "",
+    screen: `${screen.width}x${screen.height}`, lang: navigator.language
   });
-}
-
-function showNotice(done) {
-  const box = document.createElement("div");
-  box.id = "cg-notice";
-  box.innerHTML = `
-    <p>This is a student research project. We count visits anonymously (where you came from, what you click) to learn how people use it. No names, no exact location.</p>
-    <div><button data-a="yes">OK</button><button data-a="no">No thanks</button></div>`;
-  const style = document.createElement("style");
-  style.textContent = `
-    #cg-notice { position: fixed; left: 16px; bottom: 16px; z-index: 50; max-width: 340px;
-      background: rgba(255,255,255,0.96); color: #111; border: 1px solid #000; border-radius: 16px;
-      padding: 14px 16px; font: 13px/1.4 Helvetica, Arial, sans-serif; box-shadow: 0 6px 24px rgba(0,0,0,0.08); }
-    #cg-notice div { display: flex; gap: 8px; margin-top: 10px; }
-    #cg-notice button { all: unset; cursor: pointer; padding: 7px 14px; border-radius: 40px; border: 1px solid #000; font-size: 13px; }
-    #cg-notice button[data-a="yes"] { background: #111; color: #fff; }
-    @media (max-width: 600px) { #cg-notice { left: 12px; right: 12px; bottom: 12px; max-width: none; } }`;
-  document.head.appendChild(style);
-  document.body.appendChild(box);
-  box.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { box.remove(); done(b.dataset.a); }));
 }

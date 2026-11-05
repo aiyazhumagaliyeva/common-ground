@@ -5,12 +5,12 @@
 import ForceGraph3D from 'https://esm.sh/3d-force-graph@1.80.1?deps=three@0.181.0&target=es2020';
 import * as THREE from 'https://esm.sh/three@0.181.0?target=es2020';
 import { CONFIG } from './config.js';
-import { embed, layout } from './cluster.js';
+import { embed, layout, knownVector, loadModel } from './cluster.js';
 import { checkNote } from './safety.js';
 import { photoNotes, typedNotes } from './seed.js';
 import { drawQR } from './qr.js';
 import { makeCrumple } from './crumple.js';
-import { track, startTracking, SOURCE } from './track.js';
+import { track, startTracking, SOURCE, optOut, optedOut } from './track.js';
 
 startTracking("map");
 
@@ -35,7 +35,7 @@ const notes = [];
 const rnd = () => (Math.random() - 0.5) * 40;
 
 photoNotes.forEach((p, i) => notes.push({
-  id: "p" + i, text: "I wish I could " + p.text, image: `notes/${p.file}.jpg`,
+  id: "p" + i, text: p.text, image: `notes/${p.file}.jpg`, paper: p.paper,
   allowReplies: p.allowReplies !== false, group: -1
 }));
 typedNotes.forEach((t, i) => notes.push({
@@ -98,11 +98,22 @@ const dotTexture = (() => {
   return t;
 })();
 
-const dotPalette = ["#4F7CFF", "#FF8A3D", "#2FBF71", "#B266FF", "#FF5C8A", "#1FB5C9", "#E0B000", "#7A8B99", "#FF6B4A", "#5B6CFF"];
+// the dot is the color of the note's paper
 function dotColor(node) {
-  if (node.pending) return "#111111";                                  // your note
   if (CONFIG.DOT_STYLE === "ink") return "#2b2b2b";
-  return node.group >= 0 ? dotPalette[node.group % dotPalette.length] : "#9a9a9a";
+  return node.paper || node.color || "#d3cfab";
+}
+// read the paper color from a photo: the lighter 60% of pixels is paper, the rest is ink
+function paperColor(img) {
+  const c = document.createElement("canvas"); c.width = c.height = 32;
+  const g = c.getContext("2d", { willReadFrequently: true });
+  g.drawImage(img, 0, 0, 32, 32);
+  const d = g.getImageData(0, 0, 32, 32).data, px = [];
+  for (let i = 0; i < d.length; i += 4) px.push([d[i], d[i + 1], d[i + 2]]);
+  px.sort((a, b) => (a[0] + a[1] + a[2]) - (b[0] + b[1] + b[2]));
+  const paper = px.slice(Math.floor(px.length * 0.4));
+  const mid = k => paper.map(p => p[k]).sort((a, b) => a - b)[paper.length >> 1];
+  return "#" + [0, 1, 2].map(k => mid(k).toString(16).padStart(2, "0")).join("");
 }
 
 function makeBall(node) {
@@ -114,7 +125,12 @@ function makeBall(node) {
   node.__tex.colorSpace = THREE.SRGBColorSpace;
   if (node.image) {
     node.__img = new Image();
-    node.__img.onload = () => paint(node);
+    node.__img.onload = () => {
+      paint(node);
+      if (!node.paper) {                                   // new photos: measure the paper
+        try { node.paper = paperColor(node.__img); node.__dot.material.color.set(dotColor(node)); } catch (e) {}
+      }
+    };
     node.__img.src = node.image;
   }
   paint(node);
@@ -254,8 +270,12 @@ function animateToTargets(ms = 1600) {
 
 // ---- regroup everything (after load, and after every new note) ----
 function regroup() {
-  const before = notes.map(n => n.group);
-  const count = layout(notes);
+  const known = notes.filter(n => n.vec);
+  const count = layout(known);
+  notes.forEach(n => {                                   // not read yet: wait near the middle
+    if (n.vec || n.tx !== undefined) return;
+    n.tx = rnd() * 0.6; n.ty = rnd() * 0.6; n.tz = rnd() * 0.6;
+  });
   notes.forEach(n => n.__dot && n.__dot.material.color.set(dotColor(n)));
   animateToTargets();
   $("mapInfo").textContent = count === 0
@@ -339,17 +359,23 @@ async function start() {
       graph.graphData({ nodes: notes, links: [] });
     } catch (e) { console.warn("Could not load saved notes", e); }
   }
+  // 1. show the map right away with the notes we already understand
+  notes.forEach(n => (n.vec = knownVector(n.text)));
+  regroup();
+  intro();
+  showMyNote();
+  track("map_ready", { notes: notes.length, ms: Math.round(performance.now()) });
+
+  // 2. notes we haven't read before: the AI model loads quietly in the background
+  const unknown = notes.filter(n => !n.vec);
+  if (!unknown.length) return;
   try {
-    const vecs = await embed(notes.map(n => n.text));
-    notes.forEach((n, i) => (n.vec = vecs[i]));
+    const vecs = await embed(unknown.map(n => n.text));
+    unknown.forEach((n, i) => (n.vec = vecs[i]));
     regroup();
-    intro();
-    showMyNote();
-    track("map_ready", { notes: notes.length });
   } catch (e) {
     console.error(e);
-    intro();
-    $("mapInfo").textContent = "Could not load the AI model (check internet). Notes stay in the middle.";
+    $("mapInfo").textContent = "Could not load the AI model (check internet). New notes stay in the middle.";
   }
 }
 start();
@@ -527,11 +553,14 @@ const isPhone = matchMedia("(pointer: coarse)").matches && innerWidth < 900;
 $("navAdd").addEventListener("click", () => {
   openPage("addPage");
   track("add_open", { phone: isPhone });
+  if (!isPhone) loadModel().catch(() => {});        // get the AI ready before the note arrives
   $("qr").hidden = false; $("addDone").hidden = true;
   $("qrCaption").hidden = false;
   startHandoff();
 });
 $("navAbout").addEventListener("click", () => { openPage("aboutPage"); track("about_open"); });
+$("optOut").addEventListener("click", () => { optOut(); $("optOut").outerHTML = "<span>Done, your visits aren’t counted.</span>"; });
+if (optedOut()) $("optOut").outerHTML = "<span>Your visits aren’t counted.</span>";
 $("navContact").addEventListener("click", () => { openPage("contactPage"); track("contact_open"); });
 document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeAll));
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeAll(); });
@@ -551,9 +580,10 @@ async function startHandoff() {
     return;
   }
   // a random code links THIS screen to the phone that scans it
-  const session = Math.random().toString(36).slice(2, 10);
-  // the code links THIS screen to the phone; src keeps track of where this visitor came from
-  const url = CONFIG.PHONE_URL + "?s=" + session + "&src=" + encodeURIComponent(SOURCE);
+  // (short link = fewer dots in the QR)
+  const session = Math.random().toString(36).slice(2, 8);
+  // the code links THIS screen to the phone; src = where this visitor came from (left out if "direct")
+  const url = CONFIG.PHONE_URL + "?s=" + session + (SOURCE !== "direct" ? "&src=" + encodeURIComponent(SOURCE) : "");
   drawQR($("qr"), url);                                  // rounded style: edit js/qr.js
   $("addStatus").textContent = "Waiting for your photo…";
   // is the server script up to date? (old ones can't tell the screen a note arrived)
@@ -608,9 +638,15 @@ async function arrive(data) {
     id: "n" + Date.now(), text: data.text, image: data.image || null,
     allowReplies: data.allowReplies, pending: true, group: -1, __arriving: true
   };
-  try { node.vec = (await embed([node.text]))[0]; } catch (e) { console.error(e); }
+  node.vec = knownVector(node.text);
+  if (!node.vec) {
+    try {                                         // wait for the AI at most 8 s, then place it in the middle
+      node.vec = await Promise.race([embed([node.text]).then(v => v[0]), wait(8000).then(() => null)]);
+    } catch (e) { console.error(e); }
+  }
   notes.push(node);
-  if (node.vec) regroup();                      // finds its spot; the others shift a little
+  regroup();
+  if (!node.vec) embed([node.text]).then(v => { node.vec = v[0]; regroup(); }).catch(() => {});                      // finds its spot; the others shift a little
   const T = new THREE.Vector3(node.tx || 0, node.ty || 0, node.tz || 0);
   setPos(node, T);
 
