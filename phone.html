@@ -6,140 +6,181 @@
   <meta name="theme-color" content="#000000">
   <title>Common Ground — add your note</title>
   <style>
-    /* Sizes are "Figma px × --k" so the screen keeps the
-       proportions of the 393 × 852 phone-camera frame. */
-    :root { --k: calc(100vw / 393); }
+    /* ============================================================
+       SCALE: sizes are "Figma px × --k". --k is limited by BOTH the
+       width (393) and the visible height (730 = everything down to the
+       last button + margin), so all buttons always fit on screen,
+       even with the browser bars showing.
+       ============================================================ */
+    :root { --k: min(calc(100vw / 393), calc(100vh / 730)); }
+    @supports (height: 100dvh) { :root { --k: min(calc(100vw / 393), calc(100dvh / 730)); } }
     * { box-sizing: border-box; margin: 0; }
     html, body { height: 100%; background: #000; overflow: hidden; }
     body {
-      font-family: -apple-system, Helvetica, Arial, sans-serif; color: #fff;
-      -webkit-user-select: none; user-select: none;
+      font-family: Helvetica, -apple-system, Arial, sans-serif; color: #fff;
+      -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
     }
 
-    /* ---------- live camera, full screen ---------- */
-    #video, #still { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-    #still { display: none; }
-    body.reviewing #still { display: block; }
+    /* live camera fills the whole screen */
+    #video { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 
-    /* ---------- frosted glass everywhere except the scan window ---------- */
+    /* frosted glass over everything except the window (hole cut in JS) */
     #frost {
       position: fixed; inset: 0; pointer-events: none;
       background: rgba(213, 213, 213, 0.18);
       backdrop-filter: blur(22px) saturate(110%);
       -webkit-backdrop-filter: blur(22px) saturate(110%);
     }
-    /* the scan window: rounded square (Figma: 370 × 370, radius 30, top 117) */
-    #window {
-      position: fixed; left: calc(12 * var(--k)); top: calc(117 * var(--k));
-      width: calc(370 * var(--k)); height: calc(370 * var(--k));
-      border-radius: calc(30 * var(--k));
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.35);
-      pointer-events: none;
+
+    /* everything else sits on a 393-wide "stage", centred */
+    #stage {
+      position: fixed; top: 0; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: calc(393 * var(--k));
     }
+    #stage > * { position: absolute; }
 
     #brand {
-      position: fixed; left: calc(12 * var(--k)); top: calc(70 * var(--k));
+      left: calc(12 * var(--k)); top: calc(59 * var(--k));
       font-family: Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700;
-      font-size: calc(24 * var(--k)); text-shadow: 0 1px 8px rgba(0,0,0,0.15);
-    }
-    #hint {
-      position: fixed; left: calc(12 * var(--k)); right: calc(12 * var(--k)); top: calc(502 * var(--k));
-      font-size: calc(16 * var(--k)); line-height: 1.35; text-align: center;
-      text-shadow: 0 1px 8px rgba(0,0,0,0.25);
+      font-size: calc(24 * var(--k)); white-space: nowrap;
     }
 
-    /* ---------- shutter (Figma: 84 ring, 72 dot, top 689) ---------- */
+    /* the window: camera size (348 × 381) → shrinks for the review step (244 × 267) */
+    #window {
+      left: calc(21 * var(--k)); top: calc(103 * var(--k));
+      width: calc(348 * var(--k)); height: calc(381 * var(--k));
+      border-radius: calc(30 * var(--k)); overflow: hidden;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.35);
+      transition: left 0.35s ease, top 0.35s ease, width 0.35s ease, height 0.35s ease;
+    }
+    body.reviewing #window {
+      left: calc(73 * var(--k)); top: calc(93 * var(--k));
+      width: calc(244 * var(--k)); height: calc(267 * var(--k));
+    }
+    #still { width: 100%; height: 100%; object-fit: cover; display: none; }
+    body.reviewing #still { display: block; }
+
+    /* ---------- camera step ---------- */
     #shutter {
-      all: unset; position: fixed; left: 50%; transform: translateX(-50%);
-      top: calc(689 * var(--k)); width: calc(84 * var(--k)); height: calc(84 * var(--k));
-      border-radius: 50%; border: calc(3 * var(--k)) solid #fff;
-      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      all: unset; position: absolute; cursor: pointer;
+      left: calc(155 * var(--k)); top: calc(600 * var(--k));
+      width: calc(84 * var(--k)); height: calc(84 * var(--k));
+      border-radius: 50%; border: calc(3 * var(--k)) solid #fff; box-sizing: border-box;
+      display: flex; align-items: center; justify-content: center;
     }
     #shutter::after {
-      content: ""; width: calc(68 * var(--k)); height: calc(68 * var(--k));
+      content: ""; width: calc(70 * var(--k)); height: calc(70 * var(--k));
       border-radius: 50%; background: #fff; transition: transform 0.12s;
     }
     #shutter:active::after { transform: scale(0.9); }
+    #hint {
+      left: calc(12 * var(--k)); right: calc(12 * var(--k)); top: calc(500 * var(--k));
+      text-align: center; font-size: calc(14 * var(--k));
+    }
     #gallery {
-      position: fixed; left: 0; right: 0; top: calc(790 * var(--k));
-      text-align: center; font-size: calc(15 * var(--k));
-      text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+      left: 0; right: 0; top: calc(696 * var(--k)); text-align: center;
+      font-size: calc(14 * var(--k)); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
     }
     input[type=file] { display: none; }
+    body.reviewing #shutter, body.reviewing #hint, body.reviewing #gallery { display: none; }
 
-    /* ---------- review step ---------- */
-    #review {
-      position: fixed; left: calc(12 * var(--k)); right: calc(12 * var(--k)); top: calc(502 * var(--k));
-      display: none; flex-direction: column; gap: calc(12 * var(--k));
+    /* ---------- review step (Figma: second phone-camera) ---------- */
+    body:not(.reviewing) .review { display: none !important; }
+    body.reviewing .review { display: block; }
+
+    #status { left: calc(12 * var(--k)); top: calc(377 * var(--k)); font-size: calc(14 * var(--k)); white-space: nowrap; }
+
+    #textBox {
+      left: calc(12 * var(--k)); top: calc(406 * var(--k));
+      width: calc(365 * var(--k)); height: calc(94 * var(--k));
+      background: #fff; color: #111; border-radius: calc(20 * var(--k));
+      padding: calc(12 * var(--k)) calc(16 * var(--k));
+      font-size: calc(16 * var(--k)); line-height: 1.3;
     }
-    body.reviewing #review { display: flex; }
-    body.reviewing #shutter, body.reviewing #gallery, body.reviewing #hint { display: none; }
-    #status { font-size: calc(15 * var(--k)); text-shadow: 0 1px 8px rgba(0,0,0,0.25); }
-    .textBox {
-      background: rgba(255,255,255,0.88); color: #111; border-radius: calc(18 * var(--k));
-      padding: calc(14 * var(--k)) calc(16 * var(--k)); font-size: calc(17 * var(--k)); line-height: 1.35;
-    }
-    .textBox b { display: block; }
+    body.reviewing #textBox { display: flex; flex-direction: column; }
+    #textBox b { flex-shrink: 0; }
     textarea {
-      width: 100%; min-height: calc(52 * var(--k)); border: none; outline: none; resize: none;
-      background: transparent; font: inherit; color: inherit; -webkit-user-select: text; user-select: text;
+      flex: 1; width: 100%; border: none; outline: none; resize: none; padding: 0;
+      background: transparent; font: inherit; color: inherit;
+      -webkit-user-select: text; user-select: text;
     }
-    .toggle { display: flex; background: rgba(255,255,255,0.3); border-radius: 40px; padding: 4px; }
-    .toggle button {
-      all: unset; flex: 1; text-align: center; padding: calc(10 * var(--k)) 4px; border-radius: 40px;
-      font-size: calc(15 * var(--k)); cursor: pointer;
+
+    /* toggle: grey track + white sliding thumb */
+    #toggle {
+      left: calc(14 * var(--k)); top: calc(511 * var(--k));
+      width: calc(365 * var(--k)); height: calc(60 * var(--k));
+      border-radius: 50px; background: rgba(220, 220, 220, 0.5);
     }
-    .toggle button.on { background: #fff; color: #111; }
-    .actions { display: flex; gap: calc(10 * var(--k)); }
-    .btn {
-      all: unset; flex: 1; text-align: center; cursor: pointer;
-      padding: calc(14 * var(--k)) 0; border-radius: 40px; font-size: calc(17 * var(--k)); font-weight: 600;
-      border: 1.5px solid #fff;
+    body.reviewing #toggle { display: flex; align-items: center; }
+    #toggle .thumb {
+      position: absolute; top: calc(5 * var(--k)); left: calc(5 * var(--k));
+      width: calc(178 * var(--k)); height: calc(50 * var(--k));
+      border-radius: 50px; background: #fff; transition: transform 0.25s ease;
     }
-    .btn.primary { background: #fff; color: #111; }
-    .btn:disabled { opacity: 0.5; }
+    #toggle.private .thumb { transform: translateX(calc(177 * var(--k))); }
+    #toggle button {
+      all: unset; position: relative; flex: 1; text-align: center; cursor: pointer;
+      font-size: calc(15 * var(--k)); color: #fff; transition: color 0.25s;
+    }
+    #toggle:not(.private) #open, #toggle.private #share { color: #111; }
+
+    #send {
+      all: unset; position: absolute; cursor: pointer; text-align: center;
+      left: calc(14 * var(--k)); top: calc(627 * var(--k));
+      width: calc(365 * var(--k)); height: calc(50 * var(--k)); line-height: calc(50 * var(--k));
+      border-radius: 50px; background: #fff; color: #000; font-size: calc(18 * var(--k));
+    }
+    #send:disabled { opacity: 0.6; }
+    #retake {
+      all: unset; position: absolute; cursor: pointer; left: 0; right: 0; top: calc(690 * var(--k));
+      text-align: center; font-size: calc(14 * var(--k));
+      text-decoration: underline; text-underline-offset: 3px;
+    }
 
     /* ---------- full-screen messages (sent / support / no camera) ---------- */
     .screen {
       position: fixed; inset: 0; display: none; flex-direction: column; justify-content: center;
-      gap: calc(16 * var(--k)); padding: calc(28 * var(--k));
-      background: #fff; color: #111; font-size: calc(17 * var(--k)); line-height: 1.45;
+      gap: 16px; padding: 28px; overflow-y: auto;
+      background: #fff; color: #111; font-size: 17px; line-height: 1.45;
     }
     .screen.show { display: flex; }
-    .screen h1 { font-size: calc(28 * var(--k)); line-height: 1.2; }
-    .screen .btn { flex: none; color: #111; border-color: #111; }
+    .screen h1 { font-size: 26px; line-height: 1.2; }
+    .screen .btn {
+      display: block; text-align: center; cursor: pointer; padding: 14px 0;
+      border-radius: 50px; border: 1.5px solid #111; font-size: 17px;
+    }
     .screen .btn.primary { background: #111; color: #fff; }
     .screen a { color: inherit; }
   </style>
 </head>
 <body>
   <video id="video" playsinline autoplay muted></video>
-  <img id="still" alt="">
   <div id="frost"></div>
-  <div id="window"></div>
 
-  <div id="brand">Common Ground</div>
-  <p id="hint">Fit your note inside the square.</p>
-  <button id="shutter" aria-label="Take photo"></button>
-  <label id="gallery" for="pick">or choose from your photos</label>
-  <input type="file" id="pick" accept="image/*">
+  <div id="stage">
+    <div id="brand">Common Ground</div>
+    <div id="window"><img id="still" alt="Your note"></div>
 
-  <!-- check the text -->
-  <div id="review">
-    <p id="status">Reading your handwriting…</p>
-    <div class="textBox">
+    <!-- camera step -->
+    <p id="hint">Fit your note inside the frame.</p>
+    <button id="shutter" aria-label="Take photo"></button>
+    <label id="gallery" for="pick">or choose from your photos</label>
+
+    <!-- review step -->
+    <p id="status" class="review">Reading your handwriting…</p>
+    <div id="textBox" class="review">
       <b>I wish I could</b>
-      <textarea id="text" placeholder="what your note says"></textarea>
+      <textarea id="text" placeholder="what your note says" aria-label="What your note says"></textarea>
     </div>
-    <div class="toggle">
-      <button id="open" class="on">Open to responses</button>
-      <button id="share">Just sharing</button>
+    <div id="toggle" class="review" role="group" aria-label="Replies">
+      <span class="thumb"></span>
+      <button id="open" aria-pressed="true">Open to responses</button>
+      <button id="share" aria-pressed="false">Just sharing</button>
     </div>
-    <div class="actions">
-      <button class="btn" id="retake">Retake</button>
-      <button class="btn primary" id="send">Send</button>
-    </div>
+    <button id="send" class="review">Submit</button>
+    <button id="retake" class="review">Retake photo</button>
   </div>
+  <input type="file" id="pick" accept="image/*">
 
   <!-- camera not available -->
   <div class="screen" id="noCamera">
@@ -186,6 +227,7 @@
     }
     cutHole();
     addEventListener("resize", cutHole);
+    $("window").addEventListener("transitionend", cutHole);
 
     // ---------- start the back camera ----------
     async function startCamera() {
@@ -211,8 +253,7 @@
       const offX = (innerWidth - v.videoWidth * scale) / 2;
       const offY = (innerHeight - v.videoHeight * scale) / 2;
       const sx = (r.left - offX) / scale, sy = (r.top - offY) / scale;
-      const ss = r.width / scale;
-      useImage(v, sx, sy, ss, ss);
+      useImage(v, sx, sy, r.width / scale, r.height / scale);
     };
 
     // ---------- gallery / fallback photo ----------
@@ -228,24 +269,28 @@
     $("snap").onchange = fromFile;
 
     // Redrawing on a canvas also removes hidden photo data (GPS location etc.)
-    function crop(src, sx, sy, sw, sh, size) {
+    function crop(src, sx, sy, sw, sh, maxSide, square = false) {
+      if (square) {                                   // centre square (for the map)
+        const m = Math.min(sw, sh);
+        sx += (sw - m) / 2; sy += (sh - m) / 2; sw = sh = m;
+      }
+      const k = Math.min(1, maxSide / Math.max(sw, sh));
       const c = document.createElement("canvas");
-      c.width = c.height = size;
-      c.getContext("2d").drawImage(src, sx, sy, sw, sh, 0, 0, size, size);
+      c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+      c.getContext("2d").drawImage(src, sx, sy, sw, sh, 0, 0, c.width, c.height);
       return c;
     }
 
     async function useImage(src, sx, sy, sw, sh) {
-      const big = crop(src, sx, sy, sw, sh, Math.min(1200, Math.round(sw)));
-      const small = crop(src, sx, sy, sw, sh, 320);
+      const big = crop(src, sx, sy, sw, sh, 1200);
+      const small = crop(src, sx, sy, sw, sh, 320, true);
       thumb = small.toDataURL("image/jpeg", 0.7);
       if (thumb.length > 48000) thumb = small.toDataURL("image/jpeg", 0.5);
 
       // freeze: show the photo inside the window, camera off
-      const shown = crop(src, sx, sy, sw, sh, 900);
-      $("still").src = shown.toDataURL("image/jpeg", 0.85);
-      placeStill();
+      $("still").src = crop(src, sx, sy, sw, sh, 900).toDataURL("image/jpeg", 0.85);
       document.body.classList.add("reviewing");
+      cutHole();
       $("text").value = "";
       $("status").textContent = "Reading your handwriting…";
 
@@ -261,24 +306,23 @@
       }
     }
 
-    // the frozen photo sits exactly where the window is
-    function placeStill() {
-      const r = $("window").getBoundingClientRect(), st = $("still").style;
-      Object.assign(st, { inset: "auto", left: r.left + "px", top: r.top + "px",
-        width: r.width + "px", height: r.height + "px", borderRadius: getComputedStyle($("window")).borderRadius });
-    }
-
     function clean(t) {
       return t.replace(/\s+/g, " ").replace(/^\s*i\s*wish\s*i\s*could\s*/i, "").trim();
     }
 
     $("retake").onclick = () => {
       document.body.classList.remove("reviewing");
+      cutHole();
       $("pick").value = ""; $("snap").value = "";
       if (!stream) $("noCamera").classList.add("show");
     };
-    $("open").onclick = () => { allowReplies = true; $("open").classList.add("on"); $("share").classList.remove("on"); };
-    $("share").onclick = () => { allowReplies = false; $("share").classList.add("on"); $("open").classList.remove("on"); };
+    function setReplies(on) {
+      allowReplies = on;
+      $("toggle").classList.toggle("private", !on);
+      $("open").setAttribute("aria-pressed", on); $("share").setAttribute("aria-pressed", !on);
+    }
+    $("open").onclick = () => setReplies(true);
+    $("share").onclick = () => setReplies(false);
 
     $("send").onclick = async () => {
       const text = $("text").value.trim();
@@ -292,6 +336,7 @@
       } catch (e) {
         console.error(e);
         $("send").disabled = false; $("send").textContent = "Try again";
+        $("status").textContent = "Couldn’t send. Check your connection and try again.";
       }
     };
 
