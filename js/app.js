@@ -8,7 +8,7 @@ import { CONFIG } from './config.js';
 import { embed, layout } from './cluster.js';
 import { checkNote } from './safety.js';
 import { photoNotes, typedNotes } from './seed.js';
-import QRCode from 'https://esm.sh/qrcode@1.5.4?target=es2020';
+import { drawQR } from './qr.js';
 
 const $ = id => document.getElementById(id);
 window.appStarted = true;
@@ -389,8 +389,8 @@ async function startHandoff() {
   }
   // a random code links THIS screen to the phone that scans it
   const session = Math.random().toString(36).slice(2, 10);
-  const url = CONFIG.SERVER_URL + "?page=upload&s=" + session;
-  await QRCode.toCanvas($("qr"), url, { width: 360, margin: 1 });   // sharp; CSS sets the size
+  const url = CONFIG.PHONE_URL + "?s=" + session;      // the phone page on your GitHub Pages site
+  drawQR($("qr"), url);                                  // rounded style: edit js/qr.js
   $("addStatus").textContent = "Waiting for your photo…";
 
   pollTimer = setInterval(async () => {

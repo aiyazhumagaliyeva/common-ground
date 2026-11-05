@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>Common Ground — add your note</title>
+  <style>
+    /* Sizes are "Figma px × --k" so the screen keeps the
+       proportions of the 393 × 852 phone-camera frame. */
+    :root { --k: calc(100vw / 393); }
+    * { box-sizing: border-box; margin: 0; }
+    html, body { height: 100%; background: #000; overflow: hidden; }
+    body {
+      font-family: -apple-system, Helvetica, Arial, sans-serif; color: #fff;
+      -webkit-user-select: none; user-select: none;
+    }
+
+    /* ---------- live camera, full screen ---------- */
+    #video, #still { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    #still { display: none; }
+    body.reviewing #still { display: block; }
+
+    /* ---------- frosted glass everywhere except the scan window ---------- */
+    #frost {
+      position: fixed; inset: 0; pointer-events: none;
+      background: rgba(213, 213, 213, 0.18);
+      backdrop-filter: blur(22px) saturate(110%);
+      -webkit-backdrop-filter: blur(22px) saturate(110%);
+    }
+    /* the scan window: rounded square (Figma: 370 × 370, radius 30, top 117) */
+    #window {
+      position: fixed; left: calc(12 * var(--k)); top: calc(117 * var(--k));
+      width: calc(370 * var(--k)); height: calc(370 * var(--k));
+      border-radius: calc(30 * var(--k));
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.35);
+      pointer-events: none;
+    }
+
+    #brand {
+      position: fixed; left: calc(12 * var(--k)); top: calc(70 * var(--k));
+      font-family: Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700;
+      font-size: calc(24 * var(--k)); text-shadow: 0 1px 8px rgba(0,0,0,0.15);
+    }
+    #hint {
+      position: fixed; left: calc(12 * var(--k)); right: calc(12 * var(--k)); top: calc(502 * var(--k));
+      font-size: calc(16 * var(--k)); line-height: 1.35; text-align: center;
+      text-shadow: 0 1px 8px rgba(0,0,0,0.25);
+    }
+
+    /* ---------- shutter (Figma: 84 ring, 72 dot, top 689) ---------- */
+    #shutter {
+      all: unset; position: fixed; left: 50%; transform: translateX(-50%);
+      top: calc(689 * var(--k)); width: calc(84 * var(--k)); height: calc(84 * var(--k));
+      border-radius: 50%; border: calc(3 * var(--k)) solid #fff;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+    }
+    #shutter::after {
+      content: ""; width: calc(68 * var(--k)); height: calc(68 * var(--k));
+      border-radius: 50%; background: #fff; transition: transform 0.12s;
+    }
+    #shutter:active::after { transform: scale(0.9); }
+    #gallery {
+      position: fixed; left: 0; right: 0; top: calc(790 * var(--k));
+      text-align: center; font-size: calc(15 * var(--k));
+      text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+    }
+    input[type=file] { display: none; }
+
+    /* ---------- review step ---------- */
+    #review {
+      position: fixed; left: calc(12 * var(--k)); right: calc(12 * var(--k)); top: calc(502 * var(--k));
+      display: none; flex-direction: column; gap: calc(12 * var(--k));
+    }
+    body.reviewing #review { display: flex; }
+    body.reviewing #shutter, body.reviewing #gallery, body.reviewing #hint { display: none; }
+    #status { font-size: calc(15 * var(--k)); text-shadow: 0 1px 8px rgba(0,0,0,0.25); }
+    .textBox {
+      background: rgba(255,255,255,0.88); color: #111; border-radius: calc(18 * var(--k));
+      padding: calc(14 * var(--k)) calc(16 * var(--k)); font-size: calc(17 * var(--k)); line-height: 1.35;
+    }
+    .textBox b { display: block; }
+    textarea {
+      width: 100%; min-height: calc(52 * var(--k)); border: none; outline: none; resize: none;
+      background: transparent; font: inherit; color: inherit; -webkit-user-select: text; user-select: text;
+    }
+    .toggle { display: flex; background: rgba(255,255,255,0.3); border-radius: 40px; padding: 4px; }
+    .toggle button {
+      all: unset; flex: 1; text-align: center; padding: calc(10 * var(--k)) 4px; border-radius: 40px;
+      font-size: calc(15 * var(--k)); cursor: pointer;
+    }
+    .toggle button.on { background: #fff; color: #111; }
+    .actions { display: flex; gap: calc(10 * var(--k)); }
+    .btn {
+      all: unset; flex: 1; text-align: center; cursor: pointer;
+      padding: calc(14 * var(--k)) 0; border-radius: 40px; font-size: calc(17 * var(--k)); font-weight: 600;
+      border: 1.5px solid #fff;
+    }
+    .btn.primary { background: #fff; color: #111; }
+    .btn:disabled { opacity: 0.5; }
+
+    /* ---------- full-screen messages (sent / support / no camera) ---------- */
+    .screen {
+      position: fixed; inset: 0; display: none; flex-direction: column; justify-content: center;
+      gap: calc(16 * var(--k)); padding: calc(28 * var(--k));
+      background: #fff; color: #111; font-size: calc(17 * var(--k)); line-height: 1.45;
+    }
+    .screen.show { display: flex; }
+    .screen h1 { font-size: calc(28 * var(--k)); line-height: 1.2; }
+    .screen .btn { flex: none; color: #111; border-color: #111; }
+    .screen .btn.primary { background: #111; color: #fff; }
+    .screen a { color: inherit; }
+  </style>
+</head>
+<body>
+  <video id="video" playsinline autoplay muted></video>
+  <img id="still" alt="">
+  <div id="frost"></div>
+  <div id="window"></div>
+
+  <div id="brand">Common Ground</div>
+  <p id="hint">Fit your note inside the square.</p>
+  <button id="shutter" aria-label="Take photo"></button>
+  <label id="gallery" for="pick">or choose from your photos</label>
+  <input type="file" id="pick" accept="image/*">
+
+  <!-- check the text -->
+  <div id="review">
+    <p id="status">Reading your handwriting…</p>
+    <div class="textBox">
+      <b>I wish I could</b>
+      <textarea id="text" placeholder="what your note says"></textarea>
+    </div>
+    <div class="toggle">
+      <button id="open" class="on">Open to responses</button>
+      <button id="share">Just sharing</button>
+    </div>
+    <div class="actions">
+      <button class="btn" id="retake">Retake</button>
+      <button class="btn primary" id="send">Send</button>
+    </div>
+  </div>
+
+  <!-- camera not available -->
+  <div class="screen" id="noCamera">
+    <h1>Add your note</h1>
+    <p>Take a photo of your note, or choose one from your photos. Fit the whole note in the picture, with as little background as possible.</p>
+    <label class="btn primary" for="snap">Take a photo</label>
+    <input type="file" id="snap" accept="image/*" capture="environment">
+    <label class="btn" for="pick">Choose from my photos</label>
+  </div>
+
+  <!-- sent -->
+  <div class="screen" id="sent">
+    <h1>Thank you. Your note has been submitted.</h1>
+    <p>Look at the screen to see where it landed. It will appear for everyone after review.</p>
+  </div>
+
+  <!-- self-harm support -->
+  <div class="screen" id="support">
+    <h1>Your note won’t be posted.</h1>
+    <p>It sounds like you might be carrying something heavy. You don’t have to handle it alone.</p>
+    <p>If you’re thinking about suicide or hurting yourself, you can call or text <b>988</b> (US, any time) to talk to someone. Outside the US: <a href="https://findahelpline.com" target="_blank" rel="noopener">findahelpline.com</a></p>
+    <p>Common Ground isn’t a support service, but the people at 988 are.</p>
+  </div>
+
+  <script type="module">
+    import { CONFIG } from './js/config.js';
+    import { checkNote } from './js/safety.js';
+
+    const $ = id => document.getElementById(id);
+    const SESSION = (new URLSearchParams(location.search).get("s") || "").replace(/[^a-z0-9]/gi, "").slice(0, 20);
+    let thumb = "", allowReplies = true, stream = null;
+
+    // ---------- frosted glass with a rounded hole over the scan window ----------
+    function cutHole() {
+      const r = $("window").getBoundingClientRect();
+      const W = innerWidth, H = innerHeight, k = parseFloat(getComputedStyle($("window")).borderRadius);
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${W}' height='${H}'>` +
+        `<path fill-rule='evenodd' fill='black' d='M0 0H${W}V${H}H0Z ` +
+        `M${r.left + k} ${r.top}H${r.right - k}Q${r.right} ${r.top} ${r.right} ${r.top + k}` +
+        `V${r.bottom - k}Q${r.right} ${r.bottom} ${r.right - k} ${r.bottom}H${r.left + k}` +
+        `Q${r.left} ${r.bottom} ${r.left} ${r.bottom - k}V${r.top + k}Q${r.left} ${r.top} ${r.left + k} ${r.top}Z'/></svg>`;
+      const url = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+      $("frost").style.maskImage = $("frost").style.webkitMaskImage = url;
+    }
+    cutHole();
+    addEventListener("resize", cutHole);
+
+    // ---------- start the back camera ----------
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1920 } }, audio: false
+        });
+        $("video").srcObject = stream;
+      } catch (e) {
+        console.warn("No camera:", e);
+        $("noCamera").classList.add("show");      // fall back to "take / choose a photo"
+      }
+    }
+    startCamera();
+
+    // ---------- shutter: crop exactly what's inside the square ----------
+    $("shutter").onclick = () => {
+      const v = $("video");
+      if (!v.videoWidth) return;
+      const r = $("window").getBoundingClientRect();
+      // the video fills the screen ("cover"), so work out which part of it is on screen
+      const scale = Math.max(innerWidth / v.videoWidth, innerHeight / v.videoHeight);
+      const offX = (innerWidth - v.videoWidth * scale) / 2;
+      const offY = (innerHeight - v.videoHeight * scale) / 2;
+      const sx = (r.left - offX) / scale, sy = (r.top - offY) / scale;
+      const ss = r.width / scale;
+      useImage(v, sx, sy, ss, ss);
+    };
+
+    // ---------- gallery / fallback photo ----------
+    async function fromFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const bmp = await createImageBitmap(file);
+      const s = Math.min(bmp.width, bmp.height);   // centre square
+      $("noCamera").classList.remove("show");
+      useImage(bmp, (bmp.width - s) / 2, (bmp.height - s) / 2, s, s);
+    }
+    $("pick").onchange = fromFile;
+    $("snap").onchange = fromFile;
+
+    // Redrawing on a canvas also removes hidden photo data (GPS location etc.)
+    function crop(src, sx, sy, sw, sh, size) {
+      const c = document.createElement("canvas");
+      c.width = c.height = size;
+      c.getContext("2d").drawImage(src, sx, sy, sw, sh, 0, 0, size, size);
+      return c;
+    }
+
+    async function useImage(src, sx, sy, sw, sh) {
+      const big = crop(src, sx, sy, sw, sh, Math.min(1200, Math.round(sw)));
+      const small = crop(src, sx, sy, sw, sh, 320);
+      thumb = small.toDataURL("image/jpeg", 0.7);
+      if (thumb.length > 48000) thumb = small.toDataURL("image/jpeg", 0.5);
+
+      // freeze: show the photo inside the window, camera off
+      const shown = crop(src, sx, sy, sw, sh, 900);
+      $("still").src = shown.toDataURL("image/jpeg", 0.85);
+      placeStill();
+      document.body.classList.add("reviewing");
+      $("text").value = "";
+      $("status").textContent = "Reading your handwriting…";
+
+      try {
+        const b64 = big.toDataURL("image/jpeg", 0.85).split(",")[1];
+        const res = await post({ action: "ocr", image: b64 });
+        const t = clean(res.text || "");
+        $("text").value = t;
+        $("status").textContent = t ? "Is this what your note says?" : "We couldn’t read it. Type what it says:";
+      } catch (e) {
+        console.error(e);
+        $("status").textContent = "We couldn’t read it. Type what it says:";
+      }
+    }
+
+    // the frozen photo sits exactly where the window is
+    function placeStill() {
+      const r = $("window").getBoundingClientRect(), st = $("still").style;
+      Object.assign(st, { inset: "auto", left: r.left + "px", top: r.top + "px",
+        width: r.width + "px", height: r.height + "px", borderRadius: getComputedStyle($("window")).borderRadius });
+    }
+
+    function clean(t) {
+      return t.replace(/\s+/g, " ").replace(/^\s*i\s*wish\s*i\s*could\s*/i, "").trim();
+    }
+
+    $("retake").onclick = () => {
+      document.body.classList.remove("reviewing");
+      $("pick").value = ""; $("snap").value = "";
+      if (!stream) $("noCamera").classList.add("show");
+    };
+    $("open").onclick = () => { allowReplies = true; $("open").classList.add("on"); $("share").classList.remove("on"); };
+    $("share").onclick = () => { allowReplies = false; $("share").classList.add("on"); $("open").classList.remove("on"); };
+
+    $("send").onclick = async () => {
+      const text = $("text").value.trim();
+      if (!text) { $("status").textContent = "Please type what your note says first."; return; }
+      const full = "I wish I could " + text;
+      $("send").disabled = true; $("send").textContent = "Sending…";
+      try {
+        await post({ action: "submit", text: full, image: thumb, allowReplies, session: SESSION });
+        if (stream) stream.getTracks().forEach(t => t.stop());
+        $(checkNote(full) === "self-harm" ? "support" : "sent").classList.add("show");
+      } catch (e) {
+        console.error(e);
+        $("send").disabled = false; $("send").textContent = "Try again";
+      }
+    };
+
+    async function post(body) {
+      // plain text avoids the extra "preflight" request Apps Script can't answer
+      const res = await fetch(CONFIG.SERVER_URL, { method: "POST", body: JSON.stringify(body) });
+      return res.json();
+    }
+  </script>
+</body>
+</html>

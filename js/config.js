@@ -6,6 +6,9 @@ export const CONFIG = {
   // Paste your Google Apps Script web app URL here (see SETUP.md).
   // Leave it empty ("") for DEMO MODE: no server, you type what the photo says,
   // and new notes are not saved after refresh.
+  // The page people open on their phone after scanning the QR (must be online, https).
+  PHONE_URL: "https://aiyazhumagaliyeva.github.io/common-ground/phone.html",
+
   SERVER_URL: "https://script.google.com/macros/s/AKfycbwa0cd4Ol5RapX61Fpu_8MPG97eLArUGOW05cOlM4cplj_C7UlwWMoeenpa9M0JmxPY2A/exec",
 
   // ---- CLUSTERING (how groups emerge) ----

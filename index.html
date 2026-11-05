@@ -281,7 +281,8 @@
     }
     .qrCard .bar { height: calc(69 * var(--k)); background: #c4c4c4; flex-shrink: 0; }
     .qrCard .inner { flex: 1; display: flex; align-items: center; justify-content: center; padding: calc(16 * var(--k)); text-align: center; }
-    #qr { width: calc(180 * var(--k)) !important; height: calc(180 * var(--k)) !important; background: #fff; border-radius: calc(10 * var(--k)); padding: calc(8 * var(--k)); }
+    #qr { width: calc(196 * var(--k)); height: calc(196 * var(--k)); }
+    #qr[hidden] { display: none; }
     .qrCard .caption { font-size: max(13px, calc(16 * var(--k))); text-align: center; }
     #addStatus { font-size: max(12px, calc(14 * var(--k))); color: rgba(0,0,0,0.55); text-align: center; min-height: 1.2em; }
     #addDone { display: flex; flex-direction: column; gap: calc(12 * var(--k)); font-size: max(14px, calc(18 * var(--k))); }
@@ -299,6 +300,17 @@
     }
     .prose p { margin-bottom: 1.2em; text-wrap: balance; }
     .prose a { color: inherit; }
+
+    /* about-new: image + text sections */
+    .about { width: min(calc(637 * var(--k)), 90vw); margin: calc(61 * var(--k)) auto calc(100 * var(--k));
+             display: flex; flex-direction: column; gap: calc(85 * var(--k)); }
+    .about section { display: flex; flex-direction: column; gap: calc(35 * var(--k)); }
+    .about .ph { width: 100%; aspect-ratio: 637 / 342; background: #d9d9d9; object-fit: cover; display: block; }
+    .about p { font-size: max(15px, calc(20 * var(--k))); line-height: normal; text-wrap: pretty; }
+    .about p + p { margin-top: 1.2em; }
+    .about a, .contact a { color: inherit; }
+    .contact { width: min(calc(541 * var(--k)), 88vw); margin: calc(64 * var(--k)) auto; font-size: max(15px, calc(20 * var(--k))); line-height: normal; }
+    .contact p + p { margin-top: 1.2em; }
 
     /* ---------- PHONES / NARROW SCREENS ---------- */
     @media (max-width: 800px) {
@@ -366,7 +378,7 @@
         <div class="box">
           <div class="bar"></div>
           <div class="inner">
-            <canvas id="qr"></canvas>
+            <div id="qr" role="img" aria-label="QR code: scan with your phone camera"></div>
             <div id="addDone" hidden>
               <b>Thank you. Your note has been submitted.</b>
               <span>It will appear for everyone after review.</span>
@@ -380,26 +392,42 @@
     </div>
   </section>
 
-  <!-- ---------- ABOUT ---------- -->
+  <!-- ---------- ABOUT (Figma: about-new) ---------- -->
   <section class="page" id="aboutPage" aria-label="About">
     <button class="back" data-close aria-label="Back to the board"><img src="icons/back.svg" alt=""></button>
     <h1>About Common Ground</h1>
-    <div class="prose">
-      <p>Common Ground is an anonymous online board of handwritten notes. Every note finishes the same sentence: “I wish I could…”<br>People write their wish by hand, take a photo, and upload it by scanning a QR code. There are no names, no likes, and no followers.</p>
-      <p>Each note becomes a point on a shared map. Notes about similar things end up close to each other, so groups form on their own as more people add theirs. Zoom in to read one person’s wish. Zoom out to see what people have in common.</p>
-      <p>While working on my thesis, I was curious about how people interact with technology. Over time, the question turned into how people interact with each other through technology.</p>
-      <p>Inspired by works like “Before I Die” by Candy Chang and “This Exquisite Forest” by Aaron Koblin and Chris Milk, I wanted to make a space where people can connect anonymously over the same things, or just share their thoughts. Together, the notes build a collection of what people usually keep to themselves.</p>
-      <p>The project started by collecting handwritten responses on sticky notes. I then designed the website in Figma and built it with HTML, CSS, and JavaScript, using a 3D graph library to place the notes in space. AI reads each note’s handwriting and wording, then places it near notes with a similar meaning.</p>
-      <p>Built by Aiya, a Communication Design student at Parsons School of Design, based in Brooklyn, NYC. She grew up practicing fine art and now works at the meeting point of design and code. See more of her work at <a href="https://aiyazhumagaliyeva.com" target="_blank" rel="noopener">aiyazhumagaliyeva.com</a></p>
+    <div class="about">
+      <section>
+        <div class="ph" role="img" aria-label="Image placeholder"></div>  <!-- replace with <img class="ph" src="..." alt="..."> -->
+        <div>
+          <p>Common Ground is an anonymous online board of handwritten notes. Every note finishes the same sentence: “I wish I could…” People write their wish by hand, take a photo, and upload it by scanning a QR code. There are no names, no likes, and no followers.</p>
+          <p>Each note becomes a point on a shared map. Notes about similar things end up close to each other, so groups form on their own as more people add theirs. Zoom in to read one person’s wish. Zoom out to see what people have in common.</p>
+        </div>
+      </section>
+      <section>
+        <div class="ph" role="img" aria-label="Image placeholder"></div>
+        <div>
+          <p>While working on my thesis, I was curious about how people interact with technology. Over time, the question turned into how people interact with each other through technology.</p>
+          <p>Inspired by works like “Before I Die” by Candy Chang and “This Exquisite Forest” by Aaron Koblin and Chris Milk, I wanted to make a space where people can connect anonymously over the same things, or just share their thoughts. Together, the notes build a collection of what people usually keep to themselves.</p>
+        </div>
+      </section>
+      <section>
+        <div class="ph" role="img" aria-label="Image placeholder"></div>
+        <div>
+          <p>The project started by collecting handwritten responses on sticky notes. I then designed the website in Figma and built it with HTML, CSS, and JavaScript, using a 3D graph library to place the notes in space. AI reads each note’s handwriting and wording, then places it near notes with a similar meaning.</p>
+          <p>Built by Aiya, a Communication Design student at Parsons School of Design, based in Brooklyn, NYC. She grew up practicing fine art and now works at the meeting point of design and code. See more of her work at <a href="https://aiyazhumagaliyeva.com" target="_blank" rel="noopener">aiyazhumagaliyeva.com</a></p>
+        </div>
+      </section>
     </div>
   </section>
 
-  <!-- ---------- CONTACT ---------- -->
+  <!-- ---------- CONTACT (Figma: contact-new) ---------- -->
   <section class="page" id="contactPage" aria-label="Contact Us">
     <button class="back" data-close aria-label="Back to the board"><img src="icons/back.svg" alt=""></button>
     <h1>Contact Us</h1>
-    <div class="prose">
-      <p>Questions, or want a note removed? Write to <a href="#">[add your email]</a>.</p>
+    <div class="contact">
+      <p>You can find us on <a href="#" target="_blank" rel="noopener">Instagram</a>.</p>   <!-- add the Instagram link in href -->
+      <p>If you have any questions or want your note to be removed, you can <a href="mailto:">email us</a> too.</p>   <!-- add your email after mailto: -->
     </div>
   </section>
 
