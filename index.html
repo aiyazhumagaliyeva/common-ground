@@ -2,6 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Common Ground</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -317,11 +318,27 @@
       :root { --k: calc(100vw / 800); }
       .steps { grid-template-columns: 1fr 1fr; }
     }
+    @media (max-width: 600px) {
+      /* bigger menu with real finger-sized buttons */
+      #nav {
+        top: 14px; width: calc(100vw - 24px); justify-content: space-between;
+        gap: 10px; padding: 6px 18px; font-size: 16px;
+      }
+      #nav .brand { font-size: 17px; }
+      #nav button { min-height: 44px; }
+      #nav .links { gap: 14px; }
+      #nav .camera { width: 20px; }
+    }
+    @media (max-width: 420px) {
+      /* too narrow for one row: name on top, links below */
+      #nav { flex-wrap: wrap; justify-content: space-around; row-gap: 0; border-radius: 26px; padding: 8px 14px 4px; }
+      #nav .brand { flex-basis: 100%; text-align: center; font-size: 18px; }
+      #nav .divider { display: none; }
+      #nav .links { gap: 22px; }
+    }
     @media (max-width: 520px) {
       .steps { grid-template-columns: 1fr; }
       .page h1 { margin-top: 72px; padding: 0 16px; font-size: 22px; }
-      #nav .brand { display: none; }
-      #nav .divider:first-of-type { display: none; }
     }
   </style>
 </head>

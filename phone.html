@@ -153,6 +153,14 @@
     .screen a { color: inherit; text-decoration: none; }
     .screen p a { text-decoration: underline; }
     .screen button.btn { all: unset; display: block; text-align: center; cursor: pointer; padding: 14px 0; border-radius: 50px; border: 1.5px solid #111; font-size: 17px; }
+    body.has-screen #sent .alone, body:not(.has-screen) #sent .withScreen { display: none; }
+
+    /* ---------- send animation: the note shrinks and flies up off the screen ---------- */
+    body.sending #window {
+      transition: transform 0.9s cubic-bezier(.5,-0.25,.7,.4), opacity 0.9s ease-in;
+      transform: translateY(-120vh) scale(0.45) rotate(-6deg); opacity: 0.6;
+    }
+    body.sending .review, body.sending #brand { opacity: 0 !important; transition: opacity 0.35s; pointer-events: none; }
     #sentPhoto { width: 46%; aspect-ratio: 1; object-fit: cover; border-radius: 20px; align-self: center; }
   </style>
 </head>
@@ -197,9 +205,12 @@
   <!-- sent -->
   <div class="screen" id="sent">
     <img id="sentPhoto" alt="Your note">
-    <h1>Thank you. Your note has been submitted.</h1>
-    <p>It will appear for everyone after review. For now, only you can see it on the board.</p>
-    <a class="btn primary" href="index.html?mine=1">See where it landed</a>
+    <h1>Sent!</h1>
+    <!-- opened from the big screen's QR: the note lives there -->
+    <p class="withScreen">Look at the screen. Your note is landing on the board.</p>
+    <!-- opened on its own (printed QR): show the board on this phone -->
+    <p class="alone">It will appear for everyone after review. For now, only you can see it on the board.</p>
+    <a class="btn primary alone" href="index.html?mine=1">See where it landed</a>
     <button class="btn" id="again">Add another note</button>
   </div>
 
@@ -217,6 +228,7 @@
 
     const $ = id => document.getElementById(id);
     const SESSION = (new URLSearchParams(location.search).get("s") || "").replace(/[^a-z0-9]/gi, "").slice(0, 20);
+    if (SESSION) document.body.classList.add("has-screen");    // a big screen is waiting for this note
     let thumb = "", allowReplies = true, stream = null;
 
     // ---------- frosted glass with a rounded hole over the scan window ----------
@@ -340,6 +352,9 @@
         if (stream) stream.getTracks().forEach(t => t.stop());
         const safe = checkNote(full) !== "self-harm";
         if (safe) {
+          $("frost").style.maskImage = $("frost").style.webkitMaskImage = "none";   // close the window
+          document.body.classList.add("sending");         // fly the note up and away
+          await new Promise(r => setTimeout(r, 950));
           // remember the note on this phone, so the map can show it before it's approved
           try { localStorage.setItem("cg:myNote", JSON.stringify({ text: full, image: thumb, allowReplies, t: Date.now() })); } catch (e) {}
           $("sentPhoto").src = thumb;

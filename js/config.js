@@ -29,6 +29,11 @@ export const CONFIG = {
   START_ZOOM: 250,        // closest the camera starts (smaller = closer)
   MAX_ZOOM: 400,          // farthest it starts, when there are many notes
   ZOOM_SPEED: 1.4,        // how fast scrolling zooms (1 = normal)
+  DRIFT_SPEED: 0.35,      // slow turning of the map until someone touches it (0 = off)
+  FLOAT: 0.08,            // how much the balls bob up and down
+  OPEN_SCALE: 1.3,        // how big a note gets when you click a ball
+  ARRIVE_SCALE: 1.65,     // how big a new note is when it flies in
+  ARRIVE_HOLD: 1200,      // ms you get to see a new note before it crumples
   PHOTO_NOTES_ONLY: true, // true = hide notes without a photo (typed test notes)
   SHOW_GROUP_FRAMES: false, // true = colored outline per group
 };

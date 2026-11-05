@@ -9,6 +9,7 @@ import { embed, layout } from './cluster.js';
 import { checkNote } from './safety.js';
 import { photoNotes, typedNotes } from './seed.js';
 import { drawQR } from './qr.js';
+import { makeCrumple } from './crumple.js';
 
 const $ = id => document.getElementById(id);
 window.appStarted = true;
@@ -73,17 +74,12 @@ function paint(node) {
     ctx.lineWidth = 18;
     ctx.strokeRect(9, 9, S - 18, S - 18);
   }
-  if (node.pending) {                                           // your note, waiting
-    ctx.fillStyle = "rgba(255,255,255,0.75)";
-    ctx.fillRect(0, S - 90, S, 90);
-    ctx.fillStyle = "#111";
-    ctx.font = "600 36px Inter, sans-serif";
-    ctx.fillText("pending review", 40, S - 32);
-  }
   node.__tex.needsUpdate = true;
 }
 
-function makeSprite(node) {
+// ---- one note = a crumpled paper ball made from its photo ----
+let introPending = true;              // balls stay hidden until the opening animation
+function makeBall(node) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 512;
   node.__ctx = canvas.getContext("2d");
@@ -95,9 +91,38 @@ function makeSprite(node) {
     node.__img.src = node.image;
   }
   paint(node);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: node.__tex, transparent: true }));
-  sprite.scale.set(CONFIG.NOTE_SIZE, CONFIG.NOTE_SIZE, 1);
-  return sprite;
+
+  const seed = [...String(node.id)].reduce((a, c) => a + c.charCodeAt(0), 0) % 97;
+  node.__crumple = makeCrumple(THREE, node.__tex, CONFIG.NOTE_SIZE * 1.6, seed);
+  node.__phase = seed;                                   // each ball floats on its own rhythm
+  const group = new THREE.Group();
+  group.add(node.__crumple.mesh);
+  node.__group = group;
+
+  if (node.__arriving) {                                 // new note: starts flat and big
+    node.__crumple.setProgress(0);
+    group.scale.setScalar(CONFIG.ARRIVE_SCALE);
+  } else if (introPending) {
+    group.scale.setScalar(0.001);                        // pops in during the intro
+  }
+  return group;
+}
+
+// ---- small animation helpers ----
+const easeInOut = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+const easeOutBack = t => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
+const wait = ms => new Promise(r => setTimeout(r, ms));
+function tween(ms, fn, ease = easeInOut) {
+  return new Promise(done => {
+    const start = performance.now();
+    const step = now => {
+      const t = Math.min(1, (now - start) / ms);
+      fn(ease(t));
+      t < 1 ? requestAnimationFrame(step) : done();
+    };
+    requestAnimationFrame(step);
+  });
 }
 
 // ============================================================
@@ -109,13 +134,13 @@ graph.width(window.innerWidth).height(window.innerHeight)
   .backgroundColor("#ffffff")
   .showNavInfo(false)
   .nodeLabel(n => n.text)
-  .nodeThreeObject(makeSprite)
+  .nodeThreeObject(makeBall)
   .cooldownTime(2500);
 graph.d3Force("charge", null);           // no physics: positions come from meaning
 graph.d3Force("link", null);
 graph.d3Force("center", null);
 graph.graphData({ nodes: notes, links: [] });
-graph.cameraPosition({ x: 0, y: 0, z: CONFIG.START_ZOOM });
+graph.cameraPosition({ x: 0, y: 0, z: CONFIG.MAX_ZOOM * 1.8 });    // intro starts far away
 
 // zoom goes toward where the mouse points, so far-away notes are easy to reach
 const controls = graph.controls();
@@ -124,6 +149,33 @@ controls.screenSpacePanning = true;
 controls.zoomSpeed = CONFIG.ZOOM_SPEED;
 controls.minDistance = 15;          // how close you can get to a note
 controls.maxDistance = 1200;
+controls.autoRotate = true;           // slow drift until someone touches the map
+controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
+controls.addEventListener("start", () => (controls.autoRotate = false));
+
+// ---- every frame: balls float and tumble; open notes face you ----
+function tick(now) {
+  const cam = graph.camera(), t = now / 1000;
+  notes.forEach(n => {
+    const g = n.__group;
+    if (!g) return;
+    g.quaternion.copy(cam.quaternion);                    // flat side always faces the camera
+    const m = n.__crumple.mesh;
+    const isBall = n.__crumple.progress >= 0.999;
+    if (n.__arriving || !isBall) {                        // flat or unfolding: hold still
+      m.rotation.x *= 0.85; m.rotation.y *= 0.85; m.position.y *= 0.85;
+    } else {
+      m.rotation.x += 0.0025; m.rotation.y += 0.0035;
+      m.position.y = Math.sin(t * 0.8 + n.__phase) * CONFIG.NOTE_SIZE * CONFIG.FLOAT;
+    }
+    if (n.__pos) {                                        // arrival animation controls it
+      g.position.copy(n.__pos);
+      n.x = n.fx = n.__pos.x; n.y = n.fy = n.__pos.y; n.z = n.fz = n.__pos.z;
+    }
+  });
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
 
 window.addEventListener("resize", () => graph.width(window.innerWidth).height(window.innerHeight));
 
@@ -136,7 +188,7 @@ function animateToTargets(ms = 1600) {
     const t = Math.min(1, (now - start) / ms);
     const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;   // ease in-out
     notes.forEach(n => {
-      if (n.tx === undefined) return;
+      if (n.tx === undefined || n.__arriving) return;
       const f = from.get(n) || [n.fx || 0, n.fy || 0, n.fz || 0];   // note added mid-animation
       n.fx = f[0] + (n.tx - f[0]) * e;
       n.fy = f[1] + (n.ty - f[1]) * e;
@@ -151,7 +203,6 @@ function animateToTargets(ms = 1600) {
 function regroup() {
   const before = notes.map(n => n.group);
   const count = layout(notes);
-  notes.forEach((n, i) => { if (n.__tex && n.group !== before[i]) paint(n); });
   animateToTargets();
   $("mapInfo").textContent = count === 0
     ? `${notes.length} wishes · no groups yet`
@@ -160,14 +211,14 @@ function regroup() {
 
 // start zoom depends on how many notes there are:
 // few notes → START_ZOOM (close), many notes → farther, up to MAX_ZOOM
-function fitCamera() {
+function fitCamera(ms = 1200) {
   const r = Math.max(...notes.map(n => Math.hypot(n.tx || 0, n.ty || 0, n.tz || 0))) + CONFIG.NOTE_SIZE;
   const fov = (graph.camera().fov * Math.PI) / 180;               // vertical field of view
   const aspect = window.innerWidth / window.innerHeight;
   const fitV = r / Math.tan(fov / 2);                              // fit top-to-bottom
   const fitH = r / (Math.tan(fov / 2) * aspect);                   // fit left-to-right
   const z = Math.min(CONFIG.MAX_ZOOM, Math.max(CONFIG.START_ZOOM, Math.max(fitV, fitH) * 1.1));
-  graph.cameraPosition({ x: 0, y: 0, z }, { x: 0, y: 0, z: 0 }, 1200);
+  graph.cameraPosition({ x: 0, y: 0, z }, { x: 0, y: 0, z: 0 }, ms);
 }
 
 function flyTo(node) {
@@ -177,13 +228,41 @@ function flyTo(node) {
                        { x: node.tx, y: node.ty, z: node.tz }, 1500);
 }
 
-graph.onNodeClick(node => {
+// ---- click a ball: it flies close and unfolds into the note ----
+let selected = null;
+async function openNote(node) {
+  if (selected === node || node.__arriving) return;
+  if (selected) closeNote();
+  selected = node;
+  controls.autoRotate = false;
   flyTo(node);
-  $("selectedText").textContent = node.text;
-  $("selectedMeta").textContent = node.pending ? "Your wish · pending review"
-    : node.allowReplies ? "Open to responses" : "Just sharing";
-  $("selected").hidden = false;
-});
+  const from = node.__crumple.progress;
+  await tween(900, e => {
+    node.__crumple.setProgress(from * (1 - e));
+    node.__group.scale.setScalar(1 + e * (CONFIG.OPEN_SCALE - 1));
+  });
+}
+function closeNote() {
+  const n = selected;
+  if (!n) return;
+  selected = null;
+  tween(700, e => {
+    n.__crumple.setProgress(e);
+    n.__group.scale.setScalar(CONFIG.OPEN_SCALE - e * (CONFIG.OPEN_SCALE - 1));
+  });
+}
+graph.onNodeClick(openNote);
+graph.onBackgroundClick(closeNote);
+
+// ---- opening animation: balls pop out of the middle into their groups ----
+function intro() {
+  introPending = false;
+  fitCamera(2600);
+  notes.forEach((n, i) => {
+    if (!n.__group) return;
+    setTimeout(() => tween(800, e => n.__group.scale.setScalar(Math.max(0.001, e)), easeOutBack), 250 + i * 45);
+  });
+}
 
 // ---- start: load saved notes, read meaning, arrange ----
 async function start() {
@@ -203,10 +282,11 @@ async function start() {
     const vecs = await embed(notes.map(n => n.text));
     notes.forEach((n, i) => (n.vec = vecs[i]));
     regroup();
-    fitCamera();
+    intro();
     showMyNote();
   } catch (e) {
     console.error(e);
+    intro();
     $("mapInfo").textContent = "Could not load the AI model (check internet). Notes stay in the middle.";
   }
 }
@@ -418,13 +498,9 @@ async function startHandoff() {
         $("addStatus").textContent = "Thank you. Your note will be reviewed before it appears.";
         return;
       }
-      $("qr").hidden = true;                      // → "Thank you" inside the QR card
-      $("qrCaption").hidden = true;
-      $("addStatus").textContent = "";
-      $("addDone").hidden = false;
-      lastNote = await addPendingNote(data);
+      lastNote = await arrive(data);              // back to the map: the note flies in
     } catch (e) { console.warn("poll failed", e); }
-  }, 3000);
+  }, 1500);
 }
 
 // came from the phone page ("See where it landed")? show that person's note
@@ -433,20 +509,62 @@ async function showMyNote() {
   let data = null;
   try { data = JSON.parse(localStorage.getItem("cg:myNote")); } catch (e) {}
   if (!data) return;
-  const node = await addPendingNote(data);
-  setTimeout(() => flyTo(node), 1800);
+  await wait(2800);                            // let the intro finish first
+  arrive(data);
 }
 
-async function addPendingNote(data) {
+// ============================================================
+//  ARRIVAL: a new note flies in from the bottom, you see it for a
+//  second, then it zooms out, crumples into a ball and joins its group.
+// ============================================================
+async function arrive(data) {
+  closeAll();                                   // leave the "Add a note" page
+  if (selected) closeNote();
+  controls.autoRotate = false;
   const node = {
     id: "n" + Date.now(), text: data.text, image: data.image || null,
-    allowReplies: data.allowReplies, pending: true, group: -1, fx: 0, fy: 0, fz: 0
+    allowReplies: data.allowReplies, pending: true, group: -1, __arriving: true
   };
+  try { node.vec = (await embed([node.text]))[0]; } catch (e) { console.error(e); }
   notes.push(node);
+  if (node.vec) regroup();                      // finds its spot; the others shift a little
+  const T = new THREE.Vector3(node.tx || 0, node.ty || 0, node.tz || 0);
+  setPos(node, T);
+
+  // 1. camera turns to where the note will land
+  const out = T.length() > 1 ? T.clone().normalize() : new THREE.Vector3(0, 0, 1);
+  const D = CONFIG.NOTE_SIZE * 6;
+  graph.cameraPosition(T.clone().addScaledVector(out, D), T, 1200);
+  await wait(1250);
+
+  // 2. the note appears below the screen, flat and big, and flies up into view
+  const cam = graph.camera();
+  const down = new THREE.Vector3(0, -1, 0).applyQuaternion(cam.quaternion);
+  const halfH = D * Math.tan((cam.fov * Math.PI) / 360);
+  const S = T.clone().addScaledVector(down, halfH * 2);
+  node.__pos = S.clone();
   graph.graphData({ nodes: notes, links: [] });
-  try {
-    node.vec = (await embed([node.text]))[0];
-    regroup();
-  } catch (e) { console.error(e); }
+  await wait(60);
+  await tween(1100, e => node.__pos.lerpVectors(S, T, e), easeOut);
+
+  // 3. a second to read it
+  await wait(CONFIG.ARRIVE_HOLD);
+
+  // 4. zoom out while it crumples into a ball
+  graph.cameraPosition(T.clone().addScaledVector(out, D * 2.6), T, 1400);
+  await tween(1400, e => {
+    node.__crumple.setProgress(e);
+    node.__group.scale.setScalar(CONFIG.ARRIVE_SCALE + (1 - CONFIG.ARRIVE_SCALE) * e);
+  });
+  node.__arriving = false;
+  node.__pos = null;
+
+  // 5. step back to see the whole map
+  await wait(500);
+  fitCamera(1800);
   return node;
+}
+
+function setPos(n, v) {
+  n.fx = n.x = n.tx = v.x; n.fy = n.y = n.ty = v.y; n.fz = n.z = n.tz = v.z;
 }
