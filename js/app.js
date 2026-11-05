@@ -103,7 +103,8 @@ function makeSprite(node) {
 // ============================================================
 //  GRAPH
 // ============================================================
-const graph = ForceGraph3D()($("map"));
+// "orbit" controls: drag = rotate, right-drag = move, scroll/pinch = zoom
+const graph = ForceGraph3D({ controlType: "orbit" })($("map"));
 graph.width(window.innerWidth).height(window.innerHeight)
   .backgroundColor("#ffffff")
   .showNavInfo(false)
@@ -116,21 +117,30 @@ graph.d3Force("center", null);
 graph.graphData({ nodes: notes, links: [] });
 graph.cameraPosition({ x: 0, y: 0, z: CONFIG.START_ZOOM });
 
+// zoom goes toward where the mouse points, so far-away notes are easy to reach
+const controls = graph.controls();
+controls.zoomToCursor = true;
+controls.screenSpacePanning = true;
+controls.zoomSpeed = CONFIG.ZOOM_SPEED;
+controls.minDistance = 15;          // how close you can get to a note
+controls.maxDistance = 1200;
+
 window.addEventListener("resize", () => graph.width(window.innerWidth).height(window.innerHeight));
 
 // ---- move every note to its new spot (smooth) ----
 function animateToTargets(ms = 1600) {
-  const from = notes.map(n => [n.fx, n.fy, n.fz]);
+  const from = new Map(notes.map(n => [n, [n.fx, n.fy, n.fz]]));   // start spot of each note
   const start = performance.now();
   graph.d3ReheatSimulation();
   function step(now) {
     const t = Math.min(1, (now - start) / ms);
     const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;   // ease in-out
-    notes.forEach((n, i) => {
+    notes.forEach(n => {
       if (n.tx === undefined) return;
-      n.fx = from[i][0] + (n.tx - from[i][0]) * e;
-      n.fy = from[i][1] + (n.ty - from[i][1]) * e;
-      n.fz = from[i][2] + (n.tz - from[i][2]) * e;
+      const f = from.get(n) || [n.fx || 0, n.fy || 0, n.fz || 0];   // note added mid-animation
+      n.fx = f[0] + (n.tx - f[0]) * e;
+      n.fy = f[1] + (n.ty - f[1]) * e;
+      n.fz = f[2] + (n.tz - f[2]) * e;
     });
     if (t < 1) requestAnimationFrame(step);
   }
@@ -161,7 +171,7 @@ function fitCamera() {
 }
 
 function flyTo(node) {
-  const dist = 45, r = Math.hypot(node.tx, node.ty, node.tz) || 1;
+  const dist = CONFIG.NOTE_SIZE * 4, r = Math.hypot(node.tx, node.ty, node.tz) || 1;   // how close it flies
   const k = 1 + dist / r;
   graph.cameraPosition({ x: node.tx * k, y: node.ty * k, z: node.tz * k },
                        { x: node.tx, y: node.ty, z: node.tz }, 1500);
@@ -194,6 +204,7 @@ async function start() {
     notes.forEach((n, i) => (n.vec = vecs[i]));
     regroup();
     fitCamera();
+    showMyNote();
   } catch (e) {
     console.error(e);
     $("mapInfo").textContent = "Could not load the AI model (check internet). Notes stay in the middle.";
@@ -414,6 +425,16 @@ async function startHandoff() {
       lastNote = await addPendingNote(data);
     } catch (e) { console.warn("poll failed", e); }
   }, 3000);
+}
+
+// came from the phone page ("See where it landed")? show that person's note
+async function showMyNote() {
+  if (!new URLSearchParams(location.search).has("mine")) return;
+  let data = null;
+  try { data = JSON.parse(localStorage.getItem("cg:myNote")); } catch (e) {}
+  if (!data) return;
+  const node = await addPendingNote(data);
+  setTimeout(() => flyTo(node), 1800);
 }
 
 async function addPendingNote(data) {

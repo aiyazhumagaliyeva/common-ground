@@ -150,7 +150,10 @@
       border-radius: 50px; border: 1.5px solid #111; font-size: 17px;
     }
     .screen .btn.primary { background: #111; color: #fff; }
-    .screen a { color: inherit; }
+    .screen a { color: inherit; text-decoration: none; }
+    .screen p a { text-decoration: underline; }
+    .screen button.btn { all: unset; display: block; text-align: center; cursor: pointer; padding: 14px 0; border-radius: 50px; border: 1.5px solid #111; font-size: 17px; }
+    #sentPhoto { width: 46%; aspect-ratio: 1; object-fit: cover; border-radius: 20px; align-self: center; }
   </style>
 </head>
 <body>
@@ -193,8 +196,11 @@
 
   <!-- sent -->
   <div class="screen" id="sent">
+    <img id="sentPhoto" alt="Your note">
     <h1>Thank you. Your note has been submitted.</h1>
-    <p>Look at the screen to see where it landed. It will appear for everyone after review.</p>
+    <p>It will appear for everyone after review. For now, only you can see it on the board.</p>
+    <a class="btn primary" href="index.html?mine=1">See where it landed</a>
+    <button class="btn" id="again">Add another note</button>
   </div>
 
   <!-- self-harm support -->
@@ -332,13 +338,21 @@
       try {
         await post({ action: "submit", text: full, image: thumb, allowReplies, session: SESSION });
         if (stream) stream.getTracks().forEach(t => t.stop());
-        $(checkNote(full) === "self-harm" ? "support" : "sent").classList.add("show");
+        const safe = checkNote(full) !== "self-harm";
+        if (safe) {
+          // remember the note on this phone, so the map can show it before it's approved
+          try { localStorage.setItem("cg:myNote", JSON.stringify({ text: full, image: thumb, allowReplies, t: Date.now() })); } catch (e) {}
+          $("sentPhoto").src = thumb;
+        }
+        $(safe ? "sent" : "support").classList.add("show");
       } catch (e) {
         console.error(e);
         $("send").disabled = false; $("send").textContent = "Try again";
         $("status").textContent = "Couldn’t send. Check your connection and try again.";
       }
     };
+
+    $("again").onclick = () => location.reload();
 
     async function post(body) {
       // plain text avoids the extra "preflight" request Apps Script can't answer
