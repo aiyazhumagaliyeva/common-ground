@@ -10,6 +10,9 @@ import { checkNote } from './safety.js';
 import { photoNotes, typedNotes } from './seed.js';
 import { drawQR } from './qr.js';
 import { makeCrumple } from './crumple.js';
+import { track, startTracking, SOURCE } from './track.js';
+
+startTracking("map");
 
 const $ = id => document.getElementById(id);
 window.appStarted = true;
@@ -77,9 +80,33 @@ function paint(node) {
   node.__tex.needsUpdate = true;
 }
 
-// ---- one note = a crumpled paper ball made from its photo ----
-let introPending = true;              // balls stay hidden until the opening animation
+// ============================================================
+//  ONE NOTE = a flat dot on the map.
+//  The paper (photo) only appears when a note arrives or is opened:
+//  it unfolds out of the dot / crumples back into it.
+// ============================================================
+let introPending = true;              // dots stay hidden until the opening animation
+
+// soft round dot texture (shared)
+const dotTexture = (() => {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d");
+  g.beginPath(); g.arc(64, 64, 60, 0, Math.PI * 2); g.fillStyle = "#fff"; g.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+
+const dotPalette = ["#4F7CFF", "#FF8A3D", "#2FBF71", "#B266FF", "#FF5C8A", "#1FB5C9", "#E0B000", "#7A8B99", "#FF6B4A", "#5B6CFF"];
+function dotColor(node) {
+  if (node.pending) return "#111111";                                  // your note
+  if (CONFIG.DOT_STYLE === "ink") return "#2b2b2b";
+  return node.group >= 0 ? dotPalette[node.group % dotPalette.length] : "#9a9a9a";
+}
+
 function makeBall(node) {
+  // the paper texture (photo, or typed text)
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 512;
   node.__ctx = canvas.getContext("2d");
@@ -92,20 +119,46 @@ function makeBall(node) {
   }
   paint(node);
 
-  const seed = [...String(node.id)].reduce((a, c) => a + c.charCodeAt(0), 0) % 97;
-  node.__crumple = makeCrumple(THREE, node.__tex, CONFIG.NOTE_SIZE * 1.6, seed);
-  node.__phase = seed;                                   // each ball floats on its own rhythm
   const group = new THREE.Group();
-  group.add(node.__crumple.mesh);
   node.__group = group;
 
-  if (node.__arriving) {                                 // new note: starts flat and big
+  // the dot (always faces you, never shaded)
+  const dot = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTexture, color: dotColor(node), transparent: true }));
+  dot.scale.setScalar(CONFIG.DOT_SIZE);
+  node.__dot = dot;
+  group.add(dot);
+
+  // the paper: hidden until needed
+  const seed = [...String(node.id)].reduce((a, c) => a + c.charCodeAt(0), 0) % 97;
+  node.__crumple = makeCrumple(THREE, node.__tex, CONFIG.NOTE_SIZE * 1.6, seed);
+  node.__phase = seed;
+  node.__crumple.mesh.visible = false;
+  group.add(node.__crumple.mesh);
+
+  if (node.__arriving) {                                 // new note: flat paper, big, no dot yet
     node.__crumple.setProgress(0);
+    node.__crumple.mesh.visible = true;
+    dot.visible = false;
     group.scale.setScalar(CONFIG.ARRIVE_SCALE);
   } else if (introPending) {
     group.scale.setScalar(0.001);                        // pops in during the intro
   }
   return group;
+}
+
+// paper → dot: shrink the ball away and fade the dot in
+async function paperToDot(n, ms = 500) {
+  const m = n.__crumple.mesh, d = n.__dot;
+  d.visible = true;
+  d.material.opacity = 0;
+  const s0 = n.__group.scale.x;
+  await tween(ms, e => {
+    m.scale.setScalar(1 - e * 0.85);
+    m.material.opacity = 1 - e;
+    d.material.opacity = e;
+    n.__group.scale.setScalar(s0 + (1 - s0) * e);
+  });
+  m.visible = false; m.scale.setScalar(1); m.material.opacity = 1;
 }
 
 // ---- small animation helpers ----
@@ -153,27 +206,27 @@ controls.autoRotate = true;           // slow drift until someone touches the ma
 controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
 controls.addEventListener("start", () => (controls.autoRotate = false));
 
-// ---- every frame: balls float and tumble; open notes face you ----
+// ---- every frame: dots float gently; paper faces you ----
 function tick(now) {
   const cam = graph.camera(), t = now / 1000;
   notes.forEach(n => {
     const g = n.__group;
     if (!g) return;
-    g.quaternion.copy(cam.quaternion);                    // flat side always faces the camera
+    g.quaternion.copy(cam.quaternion);                    // paper always faces the camera
+    const bob = Math.sin(t * 0.8 + n.__phase) * CONFIG.NOTE_SIZE * CONFIG.FLOAT;
+    n.__dot.position.y = bob;
     const m = n.__crumple.mesh;
-    const isBall = n.__crumple.progress >= 0.999;
-    if (n.__arriving || !isBall) {                        // flat or unfolding: hold still
-      m.rotation.x *= 0.85; m.rotation.y *= 0.85; m.position.y *= 0.85;
+    if (m.visible && n.__crumple.progress >= 0.999 && !n.__arriving) {
+      m.rotation.x += 0.004; m.rotation.y += 0.006;      // a crumpled ball tumbles a bit
     } else {
-      m.rotation.x += 0.0025; m.rotation.y += 0.0035;
-      m.position.y = Math.sin(t * 0.8 + n.__phase) * CONFIG.NOTE_SIZE * CONFIG.FLOAT;
+      m.rotation.x *= 0.85; m.rotation.y *= 0.85;
     }
     if (n.__pos) {                                        // arrival animation controls it
       g.position.copy(n.__pos);
       n.x = n.fx = n.__pos.x; n.y = n.fy = n.__pos.y; n.z = n.fz = n.__pos.z;
     }
   });
-  requestAnimationFrame(tick);
+requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
 
@@ -203,6 +256,7 @@ function animateToTargets(ms = 1600) {
 function regroup() {
   const before = notes.map(n => n.group);
   const count = layout(notes);
+  notes.forEach(n => n.__dot && n.__dot.material.color.set(dotColor(n)));
   animateToTargets();
   $("mapInfo").textContent = count === 0
     ? `${notes.length} wishes · no groups yet`
@@ -236,20 +290,27 @@ async function openNote(node) {
   selected = node;
   controls.autoRotate = false;
   flyTo(node);
-  const from = node.__crumple.progress;
+  track("note_open", { id: node.id });
+  node.__openedAt = performance.now();
+  const m = node.__crumple.mesh;
+  m.visible = true; m.material.opacity = 1;
+  node.__crumple.setProgress(1);
+  node.__dot.visible = false;
   await tween(900, e => {
-    node.__crumple.setProgress(from * (1 - e));
+    node.__crumple.setProgress(1 - e);
     node.__group.scale.setScalar(1 + e * (CONFIG.OPEN_SCALE - 1));
   });
 }
-function closeNote() {
+async function closeNote() {
   const n = selected;
   if (!n) return;
   selected = null;
-  tween(700, e => {
+  track("note_close", { id: n.id, seconds: Math.round((performance.now() - n.__openedAt) / 1000) });
+  await tween(600, e => {
     n.__crumple.setProgress(e);
     n.__group.scale.setScalar(CONFIG.OPEN_SCALE - e * (CONFIG.OPEN_SCALE - 1));
   });
+  await paperToDot(n, 400);
 }
 graph.onNodeClick(openNote);
 graph.onBackgroundClick(closeNote);
@@ -284,6 +345,7 @@ async function start() {
     regroup();
     intro();
     showMyNote();
+    track("map_ready", { notes: notes.length });
   } catch (e) {
     console.error(e);
     intro();
@@ -461,34 +523,55 @@ function closeAll() {
   clearInterval(pollTimer);
 }
 
+const isPhone = matchMedia("(pointer: coarse)").matches && innerWidth < 900;
 $("navAdd").addEventListener("click", () => {
   openPage("addPage");
+  track("add_open", { phone: isPhone });
   $("qr").hidden = false; $("addDone").hidden = true;
   $("qrCaption").hidden = false;
   startHandoff();
 });
-$("navAbout").addEventListener("click", () => openPage("aboutPage"));
-$("navContact").addEventListener("click", () => openPage("contactPage"));
+$("navAbout").addEventListener("click", () => { openPage("aboutPage"); track("about_open"); });
+$("navContact").addEventListener("click", () => { openPage("contactPage"); track("contact_open"); });
 document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeAll));
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeAll(); });
 $("seeNote").addEventListener("click", () => { closeAll(); if (lastNote) setTimeout(() => flyTo(lastNote), 400); });
 
 async function startHandoff() {
+  if (isPhone) {                                     // on a phone: no QR, go straight to the camera
+    $("qr").hidden = true;
+    $("qrCaption").hidden = true;
+    $("openCamera").hidden = false;
+    $("openCamera").href = "phone.html?src=" + encodeURIComponent(SOURCE);
+    $("addStatus").textContent = "";
+    return;
+  }
   if (!serverOn) {
     $("addStatus").textContent = "Add your server URL in js/config.js to use this.";
     return;
   }
   // a random code links THIS screen to the phone that scans it
   const session = Math.random().toString(36).slice(2, 10);
-  const url = CONFIG.PHONE_URL + "?s=" + session;      // the phone page on your GitHub Pages site
+  // the code links THIS screen to the phone; src keeps track of where this visitor came from
+  const url = CONFIG.PHONE_URL + "?s=" + session + "&src=" + encodeURIComponent(SOURCE);
   drawQR($("qr"), url);                                  // rounded style: edit js/qr.js
   $("addStatus").textContent = "Waiting for your photo…";
+  // is the server script up to date? (old ones can't tell the screen a note arrived)
+  fetch(CONFIG.SERVER_URL + "?action=version").then(r => r.json()).then(v => {
+    if (!(v.version >= 4)) $("addStatus").textContent =
+      "Heads up: the server script is out of date, so a note sent from a phone won't show up here. Update Code.gs in Apps Script and deploy a new version.";
+  }).catch(() => {});
 
   pollTimer = setInterval(async () => {
     try {
       const res = await fetch(CONFIG.SERVER_URL + "?action=session&s=" + session);
       const data = await res.json();
-      if (data.status !== "received") return;     // still waiting (or old server script)
+      if (data.error) {                           // the server is running an old script
+        $("addStatus").textContent = "The server script is out of date, so notes can't arrive here yet. Update Code.gs in Apps Script and deploy a new version.";
+        return;
+      }
+      if (data.status !== "received") return;     // still waiting
+      track("note_arrived", { flag: data.flag });
       clearInterval(pollTimer);
       if (data.flag === "self-harm") {
         $("addStatus").textContent = "Thank you. This note won't be posted. Please check your phone.";
@@ -554,10 +637,11 @@ async function arrive(data) {
   graph.cameraPosition(T.clone().addScaledVector(out, D * 2.6), T, 1400);
   await tween(1400, e => {
     node.__crumple.setProgress(e);
-    node.__group.scale.setScalar(CONFIG.ARRIVE_SCALE + (1 - CONFIG.ARRIVE_SCALE) * e);
+    node.__group.scale.setScalar(CONFIG.ARRIVE_SCALE + (1.2 - CONFIG.ARRIVE_SCALE) * e);
   });
   node.__arriving = false;
   node.__pos = null;
+  await paperToDot(node, 600);
 
   // 5. step back to see the whole map
   await wait(500);

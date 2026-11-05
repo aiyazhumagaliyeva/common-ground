@@ -11,6 +11,10 @@ export const CONFIG = {
 
   SERVER_URL: "https://script.google.com/macros/s/AKfycbwa0cd4Ol5RapX61Fpu_8MPG97eLArUGOW05cOlM4cplj_C7UlwWMoeenpa9M0JmxPY2A/exec",
 
+  // ---- RESEARCH TRACKING (see js/track.js) ----
+  TRACKING: true,         // false = record nothing
+  CLARITY_ID: "",         // Microsoft Clarity project ID for heatmaps (clarity.microsoft.com)
+
   // ---- CLUSTERING (how groups emerge) ----
   // How similar two notes must be to belong together (0 = anything, 1 = identical).
   // Higher = more, smaller groups. Lower = fewer, bigger groups.
@@ -29,6 +33,8 @@ export const CONFIG = {
   START_ZOOM: 250,        // closest the camera starts (smaller = closer)
   MAX_ZOOM: 400,          // farthest it starts, when there are many notes
   ZOOM_SPEED: 1.4,        // how fast scrolling zooms (1 = normal)
+  DOT_STYLE: "group",     // "group" = color per group (like TensorFlow), "ink" = all dark dots
+  DOT_SIZE: 7,            // size of a dot on the map
   DRIFT_SPEED: 0.35,      // slow turning of the map until someone touches it (0 = off)
   FLOAT: 0.08,            // how much the balls bob up and down
   OPEN_SCALE: 1.3,        // how big a note gets when you click a ball

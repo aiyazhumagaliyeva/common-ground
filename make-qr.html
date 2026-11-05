@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Common Ground — QR & link maker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: Helvetica, Arial, sans-serif; color: #111; background: #fff; padding: 40px 24px 80px; }
+    main { max-width: 880px; margin: 0 auto; display: grid; grid-template-columns: 1fr 340px; gap: 48px; }
+    h1 { font-size: 28px; font-weight: 400; margin-bottom: 8px; }
+    .lead { color: rgba(0,0,0,0.6); font-size: 15px; line-height: 1.45; margin-bottom: 28px; max-width: 460px; }
+    label { display: block; font-size: 13px; color: rgba(0,0,0,0.6); margin: 18px 0 6px; }
+    select, input { width: 100%; font: inherit; font-size: 16px; padding: 12px 14px; border: 1px solid #000; border-radius: 12px; background: #fff; }
+    .hint { font-size: 12px; color: rgba(0,0,0,0.5); margin-top: 6px; }
+    .out { margin-top: 24px; padding: 14px; border-radius: 12px; background: #f2f2f2; font-size: 14px; word-break: break-all; }
+    .out b { display: block; font-size: 12px; color: rgba(0,0,0,0.55); font-weight: 400; margin-bottom: 4px; }
+    #qr { width: 100%; aspect-ratio: 1; border-radius: 24px; background: #fff; border: 1px solid #eee; padding: 18px; }
+    .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    button { all: unset; cursor: pointer; padding: 10px 16px; border-radius: 40px; border: 1px solid #000; font-size: 14px; }
+    button.primary { background: #111; color: #fff; }
+    table { width: 100%; border-collapse: collapse; margin-top: 40px; font-size: 13px; }
+    td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid #eee; }
+    th { color: rgba(0,0,0,0.55); font-weight: 400; }
+    @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>QR & link maker</h1>
+    <p class="lead">Every poster and post gets its own code, so the "events" tab in your Sheet shows where each visitor came from. Only for you; this page isn't linked anywhere.</p>
+
+    <label for="type">Where will people see it?</label>
+    <select id="type">
+      <option value="poster">Poster (QR on the street)</option>
+      <option value="tiktok">TikTok</option>
+      <option value="instagram-reel">Instagram reel</option>
+      <option value="instagram-story">Instagram story</option>
+      <option value="instagram-bio">Instagram bio</option>
+      <option value="share">Sent in a chat (DM, text, WhatsApp…)</option>
+      <option value="website">Another website (portfolio…)</option>
+      <option value="event">Event / exhibition</option>
+      <option value="other">Other</option>
+    </select>
+
+    <label for="place">Name or area (optional)</label>
+    <input id="place" placeholder="e.g. bushwick, parsons-lobby, reel-01">
+    <p class="hint">Short and lowercase works best. For posters, use the neighborhood or spot.</p>
+
+    <label for="target">Where should it open?</label>
+    <select id="target">
+      <option value="">The map (main site)</option>
+      <option value="phone.html">Straight to the camera (add a note)</option>
+    </select>
+
+    <div class="out"><b>Link</b><span id="link"></span></div>
+    <div class="out"><b>Source code it will show up as</b><span id="code"></span></div>
+    <div class="buttons"><button id="copy">Copy link</button></div>
+
+    <table id="log"><tr><th>Saved codes on this computer</th><th></th></tr></table>
+  </section>
+
+  <aside>
+    <div id="qr" role="img" aria-label="QR code preview"></div>
+    <div class="buttons">
+      <button class="primary" id="svg">Download SVG (for print)</button>
+      <button id="png">Download PNG</button>
+    </div>
+    <p class="hint">Test-scan every printed QR with 2 phones before putting it up.</p>
+  </aside>
+</main>
+
+<script type="module">
+  import { drawQR } from './js/qr.js';
+  const $ = id => document.getElementById(id);
+  const BASE = location.origin + location.pathname.replace(/make-qr\.html$/, "");
+
+  const slug = t => t.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9\-_]/g, "").slice(0, 40);
+  function current() {
+    const place = slug($("place").value);
+    const code = $("type").value + (place ? "-" + place : "");
+    const link = BASE + $("target").value + "?src=" + code;
+    return { code, link };
+  }
+  function update() {
+    const { code, link } = current();
+    $("link").textContent = link;
+    $("code").textContent = code;
+    drawQR($("qr"), link, { quiet: 2 });
+  }
+  ["type", "place", "target"].forEach(id => $(id).addEventListener("input", update));
+  update();
+
+  // remember made codes (on this computer only)
+  function saved() { try { return JSON.parse(localStorage.getItem("cg:codes") || "[]"); } catch (e) { return []; } }
+  function remember() {
+    const { code, link } = current();
+    const list = saved().filter(x => x.link !== link);
+    list.unshift({ code, link, date: new Date().toLocaleDateString() });
+    try { localStorage.setItem("cg:codes", JSON.stringify(list.slice(0, 100))); } catch (e) {}
+    showLog();
+  }
+  function showLog() {
+    $("log").innerHTML = "<tr><th>Saved codes on this computer</th><th></th></tr>" +
+      saved().map(x => `<tr><td>${x.code}</td><td>${x.date}</td></tr>`).join("");
+  }
+  showLog();
+
+  $("copy").onclick = async () => { await navigator.clipboard.writeText(current().link); remember(); $("copy").textContent = "Copied"; setTimeout(() => $("copy").textContent = "Copy link", 1200); };
+
+  function download(name, blob) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  $("svg").onclick = () => {
+    remember();
+    const svg = $("qr").querySelector("svg").outerHTML;
+    download(`qr-${current().code}.svg`, new Blob([svg], { type: "image/svg+xml" }));
+  };
+  $("png").onclick = () => {
+    remember();
+    const svg = $("qr").querySelector("svg").outerHTML;
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas"); c.width = c.height = 2000;
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, 2000, 2000);
+      g.drawImage(img, 0, 0, 2000, 2000);
+      c.toBlob(b => download(`qr-${current().code}.png`, b), "image/png");
+    };
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  };
+</script>
+</body>
+</html>

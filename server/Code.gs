@@ -1,18 +1,18 @@
 // ============================================================
 //  COMMON GROUND — Google Apps Script server
-//  Files in this Apps Script project:
-//    Code.gs     (this file)
-//    Upload.html (the page people see on their phone)
-//
-//  It does 4 things:
-//   1. shows the phone upload page (when someone scans the QR)
-//   2. reads handwriting from photos (Google Cloud Vision)
-//   3. saves every note to the "notes" tab, status = pending
+//  It does 5 things:
+//   1. reads handwriting from photos (Google Cloud Vision)
+//   2. saves every note to the "notes" tab, status = pending
+//   3. tells the big screen when a phone sent a note (session code)
 //   4. gives the website only the notes YOU marked "approved"
+//   5. saves anonymous visit events to the "events" tab (research)
 // ============================================================
 
+const VERSION = 4;   // the website checks this to know the script is up to date
+
 const SHEET_NAME = "notes";
-const HEADERS = ["id", "createdAt", "status", "flag", "text", "allowReplies", "color", "image", "session"];
+const HEADERS = ["id", "createdAt", "status", "flag", "text", "allowReplies", "color", "image", "session", "source"];
+const EVENT_HEADERS = ["time", "visitor", "visit", "event", "source", "device", "page", "detail"];
 const STATUSES = ["pending", "approved", "rejected", "flagged"];
 
 function getSheet() {
@@ -25,8 +25,20 @@ function getSheet() {
     const rule = SpreadsheetApp.newDataValidation().requireValueInList(STATUSES, true).build();
     sh.getRange("C2:C").setDataValidation(rule);
   }
-  // older sheets: add the "session" column if it's missing
+  // older sheets: add missing columns
   if (sh.getRange(1, 9).getValue() !== "session") sh.getRange(1, 9).setValue("session");
+  if (sh.getRange(1, 10).getValue() !== "source") sh.getRange(1, 10).setValue("source");
+  return sh;
+}
+
+function getEventsSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName("events");
+  if (!sh) {
+    sh = ss.insertSheet("events");
+    sh.appendRow(EVENT_HEADERS);
+    sh.setFrozenRows(1);
+  }
   return sh;
 }
 
@@ -40,6 +52,8 @@ function json(obj) {
 // ============================================================
 function doGet(e) {
   const p = e.parameter;
+
+  if (p.action === "version") return json({ version: VERSION });
 
   // the phone page (opened from the QR code)
   if (p.page === "upload") {
@@ -81,6 +95,7 @@ function doPost(e) {
   const body = JSON.parse(e.postData.contents);
   if (body.action === "ocr") return json({ text: readPhoto(body.image) });
   if (body.action === "submit") return json(saveNote(body));
+  if (body.action === "events") return json(saveEvents(body.events));
   return json({ error: "unknown action" });
 }
 
@@ -117,12 +132,26 @@ function saveNote(body) {
   const flag = checkNote(text);
   const status = flag === "ok" ? "pending" : "flagged";
   const session = String(body.session || "").replace(/[^a-z0-9]/gi, "").slice(0, 20);
+  const source = String(body.source || "").replace(/[^a-z0-9\-_]/gi, "").slice(0, 60);
   getSheet().appendRow([
     Utilities.getUuid(), new Date(), status, flag, text,
-    body.allowReplies === true, String(body.color || ""), image, session
+    body.allowReplies === true, String(body.color || ""), image, session, source
   ]);
   if (flag === "self-harm") notifyMe(text);
   return { ok: true, status, flag };
+}
+
+// ---------- anonymous visit events (from js/track.js) ----------
+function saveEvents(events) {
+  if (!Array.isArray(events) || !events.length) return { ok: true };
+  const clean = v => String(v == null ? "" : v).slice(0, 500);
+  const rows = events.slice(0, 50).map(ev => [
+    clean(ev.t), clean(ev.visitor), clean(ev.visit), clean(ev.event),
+    clean(ev.src), clean(ev.device), clean(ev.page), clean(ev.detail)
+  ]);
+  const sh = getEventsSheet();
+  sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+  return { ok: true };
 }
 
 // ============================================================
@@ -155,4 +184,4 @@ function notifyMe(text) {
 }
 
 // Run once from the editor (select "setup" → Run).
-function setup() { getSheet(); }
+function setup() { getSheet(); getEventsSheet(); }

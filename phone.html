@@ -225,10 +225,14 @@
   <script type="module">
     import { CONFIG } from './js/config.js';
     import { checkNote } from './js/safety.js';
+    import { track, startTracking, SOURCE } from './js/track.js';
 
     const $ = id => document.getElementById(id);
     const SESSION = (new URLSearchParams(location.search).get("s") || "").replace(/[^a-z0-9]/gi, "").slice(0, 20);
     if (SESSION) document.body.classList.add("has-screen");    // a big screen is waiting for this note
+    startTracking("phone");
+    track("phone_open", { withScreen: !!SESSION });
+    let ocrText = "", how = "camera";
     let thumb = "", allowReplies = true, stream = null;
 
     // ---------- frosted glass with a rounded hole over the scan window ----------
@@ -271,6 +275,7 @@
       const offX = (innerWidth - v.videoWidth * scale) / 2;
       const offY = (innerHeight - v.videoHeight * scale) / 2;
       const sx = (r.left - offX) / scale, sy = (r.top - offY) / scale;
+      how = "camera";
       useImage(v, sx, sy, r.width / scale, r.height / scale);
     };
 
@@ -281,6 +286,7 @@
       const bmp = await createImageBitmap(file);
       const s = Math.min(bmp.width, bmp.height);   // centre square
       $("noCamera").classList.remove("show");
+      how = "gallery";
       useImage(bmp, (bmp.width - s) / 2, (bmp.height - s) / 2, s, s);
     }
     $("pick").onchange = fromFile;
@@ -316,6 +322,8 @@
         const b64 = big.toDataURL("image/jpeg", 0.85).split(",")[1];
         const res = await post({ action: "ocr", image: b64 });
         const t = clean(res.text || "");
+        ocrText = t;
+        track("photo_read", { how, readOk: !!t });
         $("text").value = t;
         $("status").textContent = t ? "Is this what your note says?" : "We couldn’t read it. Type what it says:";
       } catch (e) {
@@ -330,6 +338,7 @@
 
     $("retake").onclick = () => {
       document.body.classList.remove("reviewing");
+      track("retake");
       cutHole();
       $("pick").value = ""; $("snap").value = "";
       if (!stream) $("noCamera").classList.add("show");
@@ -348,7 +357,8 @@
       const full = "I wish I could " + text;
       $("send").disabled = true; $("send").textContent = "Sending…";
       try {
-        await post({ action: "submit", text: full, image: thumb, allowReplies, session: SESSION });
+        await post({ action: "submit", text: full, image: thumb, allowReplies, session: SESSION, source: SOURCE });
+        track("submit", { allowReplies, edited: text !== ocrText, how, withScreen: !!SESSION });
         if (stream) stream.getTracks().forEach(t => t.stop());
         const safe = checkNote(full) !== "self-harm";
         if (safe) {

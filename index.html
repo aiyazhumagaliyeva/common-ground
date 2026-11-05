@@ -286,6 +286,13 @@
     #qr[hidden] { display: none; }
     .qrCard .caption { font-size: max(13px, calc(16 * var(--k))); text-align: center; }
     #addStatus { font-size: max(12px, calc(14 * var(--k))); color: rgba(0,0,0,0.55); text-align: center; min-height: 1.2em; }
+    .cameraBtn { display: block; text-align: center; padding: 14px 28px; border-radius: 40px; background: #111; color: #fff; text-decoration: none; font-size: 17px; }
+    .cameraBtn[hidden] { display: none; }
+    @media (pointer: coarse) and (max-width: 900px) {
+      .cameraBtn { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 6; padding: 18px; box-shadow: 0 6px 24px rgba(0,0,0,0.15); }
+      .steps { padding-bottom: 80px; }
+    }
+    body:has(#openCamera:not([hidden])) .qrCard .box { display: none; }
     #addDone { display: flex; flex-direction: column; gap: calc(12 * var(--k)); font-size: max(14px, calc(18 * var(--k))); }
     #addDone[hidden] { display: none; }
     #addDone button {
@@ -403,6 +410,7 @@
             </div>
           </div>
         </div>
+        <a id="openCamera" class="cameraBtn" href="phone.html" hidden>Open the camera</a>
         <p class="caption" id="qrCaption">Scan with your phone camera</p>
         <p id="addStatus"></p>
       </div>

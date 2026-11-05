@@ -37,8 +37,10 @@ export function makeCrumple(THREE, texture, size, seed = Math.random() * 100) {
     mess[i * 3 + 2] = (noise(fx * 4 + 7, fy * 4, seed) - 0.5) * size * 0.6;
   }
 
-  const mat = new THREE.MeshStandardMaterial({
-    map: texture, side: THREE.DoubleSide, roughness: 0.95, metalness: 0, flatShading: true
+  // light shading so the folds read, but it glows from inside so it never turns dark
+  const mat = new THREE.MeshLambertMaterial({
+    map: texture, emissive: 0xffffff, emissiveMap: texture, emissiveIntensity: 0.6,
+    side: THREE.DoubleSide, transparent: true, flatShading: true
   });
   const mesh = new THREE.Mesh(geo, mat);
 
