@@ -11,9 +11,11 @@ import { photoNotes, typedNotes } from './seed.js';
 import { drawQR } from './qr.js';
 import { makeCrumple } from './crumple.js';
 import { liveOn, listen } from './live.js';
+import { makeGlass } from './glass.js';
 import { track, startTracking, SOURCE, optOut, optedOut } from './track.js';
 
 startTracking("map");
+makeGlass(document.getElementById("nav"));      // liquid glass menu (settings from Figma)
 
 const $ = id => document.getElementById(id);
 window.appStarted = true;

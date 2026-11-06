@@ -45,7 +45,7 @@ export const CONFIG = {
   ZOOM_SPEED: 1.4,        // how fast scrolling zooms (1 = normal)
   DOT_STYLE: "group",     // "group" = color per group (like TensorFlow), "ink" = all dark dots
   BG_COLOR: "#c7c7c7",    // map background (also change body background-color in index.html to match)
-  DOT_COLOR: "#ffe698",   // one color for all dots ("" = each dot takes its paper's color)
+  DOT_COLOR: "#f3dd96",   // one color for all dots ("" = each dot takes its paper's color)
   DOT_SIZE: 7,            // size of a dot on the map
   DRIFT_SPEED: 0.35,      // slow turning of the map until someone touches it (0 = off)
   FLOAT: 0.08,            // how much the balls bob up and down
