@@ -293,6 +293,12 @@
       .steps { padding-bottom: 80px; }
     }
     body:has(#openCamera:not([hidden])) .qrCard .box { display: none; }
+    #liveStep { display: flex; flex-direction: column; align-items: center; gap: calc(10 * var(--k)); font-size: max(14px, calc(18 * var(--k))); animation: stepIn .4s ease-out; }
+    #liveStep[hidden] { display: none; }
+    #liveStep span:last-child { color: rgba(0,0,0,0.55); font-size: 0.8em; }
+    #liveStep .pulse { width: calc(14 * var(--k)); height: calc(14 * var(--k)); border-radius: 50%; background: #111; animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 50% { transform: scale(1.6); opacity: .35; } }
+    @keyframes stepIn { from { opacity: 0; transform: translateY(6px); } }
     #addDone { display: flex; flex-direction: column; gap: calc(12 * var(--k)); font-size: max(14px, calc(18 * var(--k))); }
     #addDone[hidden] { display: none; }
     #addDone button {
@@ -405,6 +411,7 @@
           <div class="bar"></div>
           <div class="inner">
             <div id="qr" role="img" aria-label="QR code: scan with your phone camera"></div>
+            <div id="liveStep" hidden><span class="pulse"></span><b id="liveTitle"></b><span id="liveSub"></span></div>
             <div id="addDone" hidden>
               <b>Thank you. Your note has been submitted.</b>
               <span>It will appear for everyone after review.</span>

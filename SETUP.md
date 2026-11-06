@@ -57,3 +57,15 @@ If you change `Code.gs` later: **Deploy → Manage deployments → edit → New 
 - `js/seed.js` — starting notes (13 real handwritten + fictional typed ones)
 - `notes/` — cropped photos of the real notes (the self-harm note is not included)
 - `server/Code.gs` — Google Apps Script server
+
+## Live phone → screen connection (Firebase)
+1. console.firebase.google.com → Add project → name it (e.g. common-ground) → Analytics off → Create.
+2. Build → Realtime Database → Create database → location: United States → Start in **locked mode** → Enable.
+3. Rules tab → delete everything → paste the contents of `server/firebase-rules.json` → Publish.
+4. Project settings (gear) → General → Your apps → Web (</>) → nickname → Register (no hosting).
+5. Copy the `firebaseConfig` values into `FIREBASE` in `js/config.js` (apiKey, authDomain, databaseURL, projectId, appId).
+   These values are meant to be public; the rules protect the database.
+
+## Heatmaps (Microsoft Clarity)
+1. clarity.microsoft.com → sign in → New project → website: https://aiyazhumagaliyeva.github.io/common-ground/
+2. Settings → Overview → copy the Project ID → paste into `CLARITY_ID` in `js/config.js`.

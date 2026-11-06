@@ -1,0 +1,23 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$room": {
+        ".read": true,
+        ".write": true,
+        ".validate": "$room.length >= 6 && $room.length <= 20 && (!newData.exists() || newData.hasChildren(['step', 't']))",
+        "step": { ".validate": "newData.isString() && newData.val().matches(/^(waiting|connected|photo|sent)$/)" },
+        "t": { ".validate": "newData.isNumber()" },
+        "note": {
+          "text": { ".validate": "newData.isString() && newData.val().length <= 600" },
+          "image": { ".validate": "newData.isString() && newData.val().length <= 60000" },
+          "allowReplies": { ".validate": "newData.isBoolean()" },
+          "flag": { ".validate": "newData.isString() && newData.val().length <= 20" },
+          "$other": { ".validate": false }
+        },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}

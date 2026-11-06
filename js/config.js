@@ -11,6 +11,16 @@ export const CONFIG = {
 
   SERVER_URL: "https://script.google.com/macros/s/AKfycbwa0cd4Ol5RapX61Fpu_8MPG97eLArUGOW05cOlM4cplj_C7UlwWMoeenpa9M0JmxPY2A/exec",
 
+  // ---- LIVE PHONE → SCREEN CONNECTION (Firebase, see SETUP.md) ----
+  // Paste the firebaseConfig from your Firebase project here. Empty = slower Apps Script check.
+  FIREBASE: {
+    apiKey: "",
+    authDomain: "",
+    databaseURL: "",
+    projectId: "",
+    appId: "",
+  },
+
   // ---- RESEARCH TRACKING (see js/track.js) ----
   TRACKING: true,         // false = record nothing
   CLARITY_ID: "",         // Microsoft Clarity project ID for heatmaps (clarity.microsoft.com)
@@ -34,6 +44,7 @@ export const CONFIG = {
   MAX_ZOOM: 400,          // farthest it starts, when there are many notes
   ZOOM_SPEED: 1.4,        // how fast scrolling zooms (1 = normal)
   DOT_STYLE: "group",     // "group" = color per group (like TensorFlow), "ink" = all dark dots
+  DOT_COLOR: "#ffe698",   // one color for all dots ("" = each dot takes its paper's color)
   DOT_SIZE: 7,            // size of a dot on the map
   DRIFT_SPEED: 0.35,      // slow turning of the map until someone touches it (0 = off)
   FLOAT: 0.08,            // how much the balls bob up and down

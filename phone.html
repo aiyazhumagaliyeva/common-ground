@@ -226,12 +226,14 @@
     import { CONFIG } from './js/config.js';
     import { checkNote } from './js/safety.js';
     import { track, startTracking, SOURCE } from './js/track.js';
+    import { tell } from './js/live.js';
 
     const $ = id => document.getElementById(id);
     const SESSION = (new URLSearchParams(location.search).get("s") || "").replace(/[^a-z0-9]/gi, "").slice(0, 20);
     if (SESSION) document.body.classList.add("has-screen");    // a big screen is waiting for this note
     startTracking("phone");
     track("phone_open", { withScreen: !!SESSION });
+    tell(SESSION, { step: "connected" });                     // the big screen shows "Phone connected"
     let ocrText = "", how = "camera";
     let thumb = "", allowReplies = true, stream = null;
 
@@ -315,6 +317,7 @@
       $("still").src = crop(src, sx, sy, sw, sh, 900).toDataURL("image/jpeg", 0.85);
       document.body.classList.add("reviewing");
       cutHole();
+      tell(SESSION, { step: "photo" });                       // big screen: "Your note is on the way…"
       $("text").value = "";
       $("status").textContent = "Reading your handwriting…";
 
@@ -357,7 +360,11 @@
       const full = "I wish I could " + text;
       $("send").disabled = true; $("send").textContent = "Sending…";
       try {
-        await post({ action: "submit", text: full, image: thumb, allowReplies, session: SESSION, source: SOURCE });
+        const saved = await post({ action: "submit", text: full, image: thumb, allowReplies, session: SESSION, source: SOURCE });
+        if (saved.error) throw new Error(saved.error);
+        const flag = saved.flag || checkNote(full);
+        // big screen: the note flies in (only safe notes carry text and photo)
+        tell(SESSION, { step: "sent", note: flag === "ok" ? { text: full, image: thumb, allowReplies, flag } : { flag } });
         track("submit", { allowReplies, edited: text !== ocrText, how, withScreen: !!SESSION });
         if (stream) stream.getTracks().forEach(t => t.stop());
         const safe = checkNote(full) !== "self-harm";

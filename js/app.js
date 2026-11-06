@@ -10,6 +10,7 @@ import { checkNote } from './safety.js';
 import { photoNotes, typedNotes } from './seed.js';
 import { drawQR } from './qr.js';
 import { makeCrumple } from './crumple.js';
+import { liveOn, listen } from './live.js';
 import { track, startTracking, SOURCE, optOut, optedOut } from './track.js';
 
 startTracking("map");
@@ -101,6 +102,7 @@ const dotTexture = (() => {
 // the dot is the color of the note's paper
 function dotColor(node) {
   if (CONFIG.DOT_STYLE === "ink") return "#2b2b2b";
+  if (CONFIG.DOT_COLOR) return CONFIG.DOT_COLOR;          // one color for every dot
   return node.paper || node.color || "#d3cfab";
 }
 // read the paper color from a photo: the lighter 60% of pixels is paper, the rest is ink
@@ -536,6 +538,7 @@ if (!serverOn) $("modeNote").hidden = false;
 // ============================================================
 
 let pollTimer = null;
+let closeLive = null;          // closes the live (Firebase) room
 let lastNote = null;
 
 function openPage(id) {
@@ -547,6 +550,7 @@ function closeAll() {
   document.body.classList.remove("page-open");
   document.querySelectorAll(".page").forEach(p => p.classList.remove("open"));
   clearInterval(pollTimer);
+  if (closeLive) { closeLive(); closeLive = null; }
 }
 
 const isPhone = matchMedia("(pointer: coarse)").matches && innerWidth < 900;
@@ -556,6 +560,7 @@ $("navAdd").addEventListener("click", () => {
   if (!isPhone) loadModel().catch(() => {});        // get the AI ready before the note arrives
   $("qr").hidden = false; $("addDone").hidden = true;
   $("qrCaption").hidden = false;
+  $("liveStep").hidden = true;
   startHandoff();
 });
 $("navAbout").addEventListener("click", () => { openPage("aboutPage"); track("about_open"); });
@@ -585,35 +590,53 @@ async function startHandoff() {
   // the code links THIS screen to the phone; src = where this visitor came from (left out if "direct")
   const url = CONFIG.PHONE_URL + "?s=" + session + (SOURCE !== "direct" ? "&src=" + encodeURIComponent(SOURCE) : "");
   drawQR($("qr"), url);                                  // rounded style: edit js/qr.js
-  $("addStatus").textContent = "Waiting for your photo…";
-  // is the server script up to date? (old ones can't tell the screen a note arrived)
+  $("addStatus").textContent = "";
+
+  // the note arrived (from Firebase or from the Apps Script check, whichever is first)
+  let done = false;
+  async function receive(data) {
+    if (done) return;
+    done = true;
+    clearInterval(pollTimer);
+    if (closeLive) { closeLive(); closeLive = null; }
+    track("note_arrived", { flag: data.flag, live: liveOn() });
+    if (data.flag === "self-harm") { showStep("Thank you.", "This note won’t be posted. Please check your phone."); return; }
+    if (data.flag && data.flag !== "ok") { showStep("Thank you.", "Your note will be reviewed before it appears."); return; }
+    lastNote = await arrive(data);              // back to the map: the note flies in
+  }
+
+  // 1. LIVE (Firebase): instant, with "Phone connected" → "on the way" → arrival
+  if (liveOn()) {
+    try {
+      closeLive = await listen(session, room => {
+        if (room.step === "connected") showStep("Phone connected", "Take a photo of your note");
+        if (room.step === "photo") showStep("Your note is on the way…", "Check the text on your phone, then submit");
+        if (room.step === "sent" && room.note) receive(room.note);
+      });
+    } catch (e) { console.warn("live connection failed, using the slower check", e); }
+  }
+
+  // 2. BACKUP (Apps Script): asks Google every 1.5 s
   fetch(CONFIG.SERVER_URL + "?action=version").then(r => r.json()).then(v => {
-    if (!(v.version >= 4)) $("addStatus").textContent =
+    if (!(v.version >= 4) && !liveOn()) $("addStatus").textContent =
       "Heads up: the server script is out of date, so a note sent from a phone won't show up here. Update Code.gs in Apps Script and deploy a new version.";
   }).catch(() => {});
-
   pollTimer = setInterval(async () => {
     try {
       const res = await fetch(CONFIG.SERVER_URL + "?action=session&s=" + session);
       const data = await res.json();
-      if (data.error) {                           // the server is running an old script
-        $("addStatus").textContent = "The server script is out of date, so notes can't arrive here yet. Update Code.gs in Apps Script and deploy a new version.";
-        return;
-      }
-      if (data.status !== "received") return;     // still waiting
-      track("note_arrived", { flag: data.flag });
-      clearInterval(pollTimer);
-      if (data.flag === "self-harm") {
-        $("addStatus").textContent = "Thank you. This note won't be posted. Please check your phone.";
-        return;
-      }
-      if (data.flag !== "ok") {
-        $("addStatus").textContent = "Thank you. Your note will be reviewed before it appears.";
-        return;
-      }
-      lastNote = await arrive(data);              // back to the map: the note flies in
+      if (data.status === "received") receive(data);
     } catch (e) { console.warn("poll failed", e); }
-  }, 1500);
+  }, liveOn() ? 4000 : 1500);
+}
+
+// laptop: replace the QR with what's happening on the phone
+function showStep(title, sub) {
+  $("qr").hidden = true;
+  $("qrCaption").hidden = true;
+  $("liveStep").hidden = false;
+  $("liveTitle").textContent = title;
+  $("liveSub").textContent = sub;
 }
 
 // came from the phone page ("See where it landed")? show that person's note
