@@ -202,7 +202,7 @@ function tween(ms, fn, ease = easeInOut) {
 // "orbit" controls: drag = rotate, right-drag = move, scroll/pinch = zoom
 const graph = ForceGraph3D({ controlType: "orbit" })($("map"));
 graph.width(window.innerWidth).height(window.innerHeight)
-  .backgroundColor("#ffffff")
+  .backgroundColor(CONFIG.BG_COLOR || "#ffffff")
   .showNavInfo(false)
   .nodeLabel(n => n.text)
   .nodeThreeObject(makeBall)
