@@ -44,8 +44,10 @@ export const CONFIG = {
   MAX_ZOOM: 400,          // farthest it starts, when there are many notes
   ZOOM_SPEED: 1.4,        // how fast scrolling zooms (1 = normal)
   DOT_STYLE: "group",     // "group" = color per group (like TensorFlow), "ink" = all dark dots
-  BG_COLOR: "#c7c7c7",    // map background (also change body background-color in index.html to match)
-  DOT_COLOR: "#f3dd96",   // one color for all dots ("" = each dot takes its paper's color)
+  BG_COLOR: "#ffffff",    // map background (also change body background-color in index.html to match)
+  // dots: each note gets one of these sticky-note colors (picked at random, but always the same for that note)
+  DOT_COLORS: ["#FFE14D", "#FF7EB6", "#5CC8FF", "#7BE07B"],   // yellow, pink, blue, green
+  DOT_COLOR: "",          // one color for every dot instead (e.g. "#f3dd96"); "" = use DOT_COLORS
   DOT_SIZE: 7,            // size of a dot on the map
   DRIFT_SPEED: 0.35,      // slow turning of the map until someone touches it (0 = off)
   FLOAT: 0.08,            // how much the balls bob up and down

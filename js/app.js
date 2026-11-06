@@ -105,6 +105,12 @@ const dotTexture = (() => {
 function dotColor(node) {
   if (CONFIG.DOT_STYLE === "ink") return "#2b2b2b";
   if (CONFIG.DOT_COLOR) return CONFIG.DOT_COLOR;          // one color for every dot
+  const list = CONFIG.DOT_COLORS || [];
+  if (list.length) {                                      // random sticky-note color, fixed per note
+    let h = 0;
+    for (const ch of String(node.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    return list[h % list.length];
+  }
   return node.paper || node.color || "#d3cfab";
 }
 // read the paper color from a photo: the lighter 60% of pixels is paper, the rest is ink
