@@ -28,7 +28,7 @@ export const CONFIG = {
   // ---- CLUSTERING (how groups emerge) ----
   // How similar two notes must be to belong together (0 = anything, 1 = identical).
   // Higher = more, smaller groups. Lower = fewer, bigger groups.
-  JOIN_SIMILARITY: 0.28,
+  JOIN_SIMILARITY: 0.40,
 
   // A group only "emerges" once it has this many notes.
   // Smaller sets stay in the general middle cloud.
