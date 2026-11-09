@@ -884,9 +884,9 @@ const TOUR = [
   { id: "zoom", text: touch ? "Pinch with two fingers to zoom in or zoom out" : "Slide with two fingers on the trackpad or roll the mouse roller to zoom in or zoom out",
     image: touch ? null : "illustrations/zoom.png", textAt: [955, 648], imageAt: [955, 713, 409, 221] },
   { id: "open", text: touch ? "Tap a note to open it" : "Click to open a note",
-    cursor: "click", from: [688, 544], textAt: [894, 837], opensNote: true },
+    cursor: "click", from: [688, 544], start: [930, 700], textAt: [894, 837], opensNote: true },
   { id: "add", text: touch ? "Tap here to add a note" : "Click to add a note",
-    cursor: "point", from: [756, 89], textAt: [894, 837] },
+    cursor: "click", from: [756, 89], start: [980, 330], textAt: [894, 837], loop: true },
 ];
 let tourStep = -1, tourNote = null, tourTimer = null;
 
@@ -899,16 +899,18 @@ function startTour() {
   nextTourStep();
 }
 function endTour() {
-  clearTimeout(tourTimer);
+  clearTimeout(tourTimer); clearInterval(tourTimer);
+  if (demoAnim) { demoAnim.cancel(); demoAnim = null; }
   if (tourNote) { closeNote(); tourNote = null; fitCamera(1200); }
   controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
   $("tour").hidden = true;
   document.body.classList.remove("touring");
-  try { localStorage.setItem("cg:toured", "1"); } catch (e) {}
+  try { localStorage.setItem("cg:toured", "1"); sessionStorage.setItem("cg:toured", "1"); } catch (e) {}
   track("tour_end", { step: tourStep });
 }
 function nextTourStep() {
-  clearTimeout(tourTimer);
+  clearTimeout(tourTimer); clearInterval(tourTimer);
+  if (demoAnim) { demoAnim.cancel(); demoAnim = null; }
   if (tourNote) { closeNote(); tourNote = null; fitCamera(1200); }   // back to the whole map
   tourStep++;
   if (tourStep >= TOUR.length) return endTour();
@@ -919,9 +921,8 @@ function nextTourStep() {
   at($("tourCopy"), st.textAt[0], st.textAt[1]);
   // drawing (zoom step)
   img.hidden = !st.image;
-  if (st.image) {
+  if (st.image) {                                  // drawing sits under the text, so they never overlap
     img.src = st.image;
-    at(img, st.imageAt[0], st.imageAt[1]);
     img.style.width = `calc(${st.imageAt[2]} * var(--k))`;
   }
   // the white cursor (not on phones)
@@ -937,8 +938,8 @@ function nextTourStep() {
       cur.className = "drag";
       controls.autoRotate = true;
       controls.autoRotateSpeed = 3;
-    } else if (st.cursor === "click") {
-      cur.className = "tap";
+    } else if (st.start) {                         // open / add: the cursor glides in, then clicks
+      clickDemo(cur, st);
     }
   }
   if (st.id === "rotate" && touch) { controls.autoRotate = true; controls.autoRotateSpeed = 3; }
@@ -947,9 +948,35 @@ function nextTourStep() {
     tourTimer = setTimeout(() => {
       const n = noteNear(st.from);
       if (n && tourStep === TOUR.indexOf(st)) { tourNote = n; openNote(n); }
-    }, 1100);
+    }, 2600 * 0.62);
   }
 }
+// cursor glides from st.start to st.from, presses, (loops on the "add" step)
+let demoAnim = null;
+function clickDemo(cur, st) {
+  const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--k")) || 1;
+  const dx = (st.start[0] - st.from[0]) * k, dy = (st.start[1] - st.from[1]) * k;
+  cur.src = "icons/cursor.svg";
+  if (demoAnim) demoAnim.cancel();
+  demoAnim = cur.animate([
+    { transform: `translate(${dx}px, ${dy}px)`, opacity: 0, offset: 0 },
+    { transform: `translate(${dx}px, ${dy}px)`, opacity: 1, offset: 0.08 },
+    { transform: "translate(0, 0) scale(1)", offset: 0.5, easing: "ease-out" },
+    { transform: "translate(0, 0) scale(0.82)", offset: 0.58 },
+    { transform: "translate(0, 0) scale(1)", offset: 0.68 },
+    { transform: "translate(0, 0) scale(1)", opacity: 1, offset: 0.9 },
+    { transform: "translate(0, 0) scale(1)", opacity: st.loop ? 0 : 1, offset: 1 },
+  ], { duration: 2600, iterations: st.loop ? Infinity : 1, fill: "forwards", easing: "ease-in-out" });
+  // switch to the "clicking" cursor at the moment of the press
+  const swap = () => {
+    if (TOUR[tourStep] !== st) return;
+    cur.src = "icons/cursor-click.svg";
+    setTimeout(() => { if (TOUR[tourStep] === st) cur.src = "icons/cursor.svg"; }, 700);
+  };
+  setTimeout(swap, 2600 * 0.5);
+  if (st.loop) tourTimer = setInterval(swap, 2600);
+}
+
 // the note closest to a point on the Figma artboard
 function noteNear([fx, fy]) {
   const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--k")) || 1;
@@ -970,7 +997,11 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("tour")
 
 // first visit: show it once, after the opening animation
 let toured = false;
-try { toured = localStorage.getItem("cg:toured") === "1"; } catch (e) {}
-if (CONFIG.TOUR_ON_FIRST_VISIT && !toured && !new URLSearchParams(location.search).has("mine")) {
-  setTimeout(() => { if (!document.body.classList.contains("page-open")) startTour(); }, 4200);
+try {
+  toured = CONFIG.TOUR_SHOW === "first-visit" ? localStorage.getItem("cg:toured") === "1"
+         : CONFIG.TOUR_SHOW === "every-visit" ? sessionStorage.getItem("cg:toured") === "1"
+         : true;                                                       // "never": only with the ? button
+} catch (e) {}
+if (!toured && !new URLSearchParams(location.search).has("mine")) {
+  setTimeout(() => { if (!document.body.classList.contains("page-open")) startTour(); }, 3200);
 }

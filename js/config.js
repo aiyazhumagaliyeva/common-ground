@@ -72,7 +72,7 @@ export const CONFIG = {
   GRADIENT_FROM: 0.12,    // how mixed a note must be to get a gradient dot (0–0.5)
   DOT_COLOR: "",          // one color for every dot instead (e.g. "#f3dd96"); "" = use DOT_COLORS
   DOT_SIZE: 7,            // size of a dot on the map
-  TOUR_ON_FIRST_VISIT: true, // show the walkthrough automatically the first time someone visits
+  TOUR_SHOW: "every-visit", // walkthrough shows by itself: "every-visit" (each new visit), "first-visit" (once per browser), "never" (only with ?)
   DRIFT_SPEED: 0.35,      // slow turning of the map until someone touches it (0 = off)
   FLOAT: 0.08,            // how much the balls bob up and down
   OPEN_SCALE: 1.3,        // how big a note gets when you click a ball
