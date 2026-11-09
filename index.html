@@ -200,6 +200,24 @@
 
     /* ---------- NOTES-ONLY VIEW: delete these 2 lines to bring the sidebar back ---------- */
     #sidebar { display: none !important; }
+    /* ---------- COLOR KEY (bottom left) ---------- */
+    #colorKey {
+      position: fixed; z-index: 3; left: max(16px, calc(32 * var(--k))); bottom: max(16px, calc(32 * var(--k)));
+      font-family: Helvetica, Arial, sans-serif; font-size: max(12px, calc(14 * var(--k))); color: #000;
+      transition: opacity 0.3s ease;
+    }
+    #colorKey[hidden] { display: none; }
+    body.page-open #colorKey { opacity: 0; pointer-events: none; }
+    #colorKey p { margin: 0 0 8px; color: rgba(0, 0, 0, 0.5); }
+    #colorKey ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+    #colorKey li > *, #colorKey button { display: flex; align-items: center; gap: 8px; }
+    #colorKey button { all: unset; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+    #colorKey button:hover span { text-decoration: underline; }
+    #colorKey li.between { display: flex; align-items: center; gap: 8px; color: rgba(0, 0, 0, 0.6); }
+    #colorKey i { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; display: block; }
+    #colorKey em { font-style: normal; color: rgba(0, 0, 0, 0.4); }
+    @media (max-width: 600px) { #colorKey { font-size: 12px; left: 12px; bottom: 12px; } #colorKey p { display: none; } }
+
     #mapInfo:not(.problem) { display: none; }
 
     #mapInfo {
@@ -360,6 +378,7 @@
 <body>
   <div id="map"></div>
   <div id="mapInfo"></div>
+  <aside id="colorKey" aria-label="Color key" hidden></aside>
 
   <!-- ---------- NAV PILL ---------- -->
   <nav id="nav">

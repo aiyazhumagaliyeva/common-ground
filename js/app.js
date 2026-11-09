@@ -12,6 +12,7 @@ import { drawQR } from './qr.js';
 import { makeCrumple } from './crumple.js';
 import { liveOn, listen } from './live.js';
 import { makeGlass } from './glass.js';
+import { colorByMeaning } from './colors.js';
 import { track, startTracking, SOURCE, optOut, optedOut } from './track.js';
 
 startTracking("map");
@@ -105,6 +106,7 @@ const dotTexture = (() => {
 function dotColor(node) {
   if (CONFIG.DOT_STYLE === "ink") return "#2b2b2b";
   if (CONFIG.DOT_COLOR) return CONFIG.DOT_COLOR;          // one color for every dot
+  if (CONFIG.COLOR_BY === "meaning") return node.colorA || CONFIG.DOT_COLORS[0];
   const list = CONFIG.DOT_COLORS || [];
   if (list.length) {                                      // random sticky-note color, fixed per note
     let h = 0;
@@ -113,6 +115,32 @@ function dotColor(node) {
   }
   return node.paper || node.color || "#d3cfab";
 }
+// gradient dot: a note between two meanings shows both colors
+const gradCache = new Map();
+function gradientTexture(a, b, blend) {
+  const key = a + b + blend.toFixed(2);
+  if (gradCache.has(key)) return gradCache.get(key);
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const g = c.getContext("2d");
+  const lg = g.createLinearGradient(20, 20, 108, 108);     // top-left → bottom-right
+  lg.addColorStop(0, a);
+  lg.addColorStop(Math.max(0, 0.5 - blend), a);           // more blend = more of the second color
+  lg.addColorStop(1, b);
+  g.beginPath(); g.arc(64, 64, 60, 0, Math.PI * 2); g.fillStyle = lg; g.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  gradCache.set(key, t);
+  return t;
+}
+function paintDot(n) {
+  const m = n.__dot && n.__dot.material;
+  if (!m) return;
+  const grad = CONFIG.COLOR_BY === "meaning" && !CONFIG.DOT_COLOR && CONFIG.DOT_STYLE !== "ink" && n.blend > 0;
+  m.map = grad ? gradientTexture(n.colorA, n.colorB, n.blend) : dotTexture;
+  m.color.set(grad ? "#ffffff" : dotColor(n));
+  m.needsUpdate = true;
+}
+
 // read the paper color from a photo: the lighter 60% of pixels is paper, the rest is ink
 function paperColor(img) {
   const c = document.createElement("canvas"); c.width = c.height = 32;
@@ -152,6 +180,7 @@ function makeBall(node) {
   const dot = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTexture, color: dotColor(node), transparent: true }));
   dot.scale.setScalar(CONFIG.DOT_SIZE);
   node.__dot = dot;
+  paintDot(node);
   group.add(dot);
 
   // the paper: hidden until needed
@@ -286,11 +315,42 @@ function regroup() {
     if (n.vec || n.tx !== undefined) return;
     n.tx = rnd() * 0.6; n.ty = rnd() * 0.6; n.tz = rnd() * 0.6;
   });
-  notes.forEach(n => n.__dot && n.__dot.material.color.set(dotColor(n)));
+  const key = colorByMeaning(notes);                      // colors follow meaning
+  notes.forEach(paintDot);
+  drawKey(key);
   animateToTargets();
   $("mapInfo").textContent = count === 0
     ? `${notes.length} wishes · no groups yet`
     : `${notes.length} wishes · ${count} groups have formed`;
+}
+
+// ---- the color key (bottom left) ----
+function drawKey(key) {
+  const box = $("colorKey");
+  if (!box) return;
+  if (CONFIG.COLOR_BY !== "meaning" || CONFIG.DOT_COLOR || !key.groups.length) { box.hidden = true; return; }
+  box.hidden = false;
+  const rows = key.groups.map(g =>
+    `<li><button type="button" data-group="${g.id}"><i style="background:${g.color}"></i>` +
+    `<span>${g.name.replace(/</g, "&lt;")}</span><em>${g.count}</em></button></li>`).join("");
+  const c = key.groups.map(g => g.color);
+  const between = key.mixed ? `<li class="between"><i style="background:linear-gradient(135deg, ${c[0]} 35%, ${c[1] || c[0]})"></i>` +
+    `<span>In between two meanings</span><em>${key.mixed}</em></li>` : "";
+  box.innerHTML = `<p>Color = meaning</p><ul>${rows}${between}</ul>`;
+  box.querySelectorAll("button[data-group]").forEach(b => b.addEventListener("click", () => flyToGroup(+b.dataset.group)));
+}
+// click a row in the key: the camera flies to that group
+function flyToGroup(id) {
+  const g = notes.filter(n => n.group === id && n.tx !== undefined);
+  if (!g.length) return;
+  if (selected) closeNote();
+  controls.autoRotate = false;
+  const c = g.reduce((a, n) => [a[0] + n.tx / g.length, a[1] + n.ty / g.length, a[2] + n.tz / g.length], [0, 0, 0]);
+  const r = Math.max(30, ...g.map(n => Math.hypot(n.tx - c[0], n.ty - c[1], n.tz - c[2])));
+  const L = Math.hypot(...c) || 1, d = r * 3.2;
+  graph.cameraPosition({ x: c[0] + (c[0] / L) * d, y: c[1] + (c[1] / L) * d, z: c[2] + (c[2] / L) * d },
+                       { x: c[0], y: c[1], z: c[2] }, 1400);
+  track("key_click", { group: id });
 }
 
 // start zoom depends on how many notes there are:
