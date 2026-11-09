@@ -132,9 +132,15 @@ function gradientTexture(a, b, blend) {
   gradCache.set(key, t);
   return t;
 }
+const imageLook = () => CONFIG.NOTE_LOOK === "image";
 function paintDot(n) {
   const m = n.__dot && n.__dot.material;
   if (!m) return;
+  if (imageLook()) {                                      // the note's photo, flat, always facing you
+    m.map = n.__tex; m.color.set("#ffffff"); m.needsUpdate = true;
+    n.__dot.scale.setScalar(CONFIG.NOTE_SIZE);
+    return;
+  }
   const grad = CONFIG.COLOR_BY === "meaning" && !CONFIG.DOT_COLOR && CONFIG.DOT_STYLE !== "ink" && n.blend > 0;
   m.map = grad ? gradientTexture(n.colorA, n.colorB, n.blend) : dotTexture;
   m.color.set(grad ? "#ffffff" : dotColor(n));
@@ -166,7 +172,7 @@ function makeBall(node) {
     node.__img.onload = () => {
       paint(node);
       if (!node.paper) {                                   // new photos: measure the paper
-        try { node.paper = paperColor(node.__img); node.__dot.material.color.set(dotColor(node)); } catch (e) {}
+        try { node.paper = paperColor(node.__img); paintDot(node); } catch (e) {}
       }
     };
     node.__img.src = node.image;
@@ -328,7 +334,7 @@ function regroup() {
 function drawKey(key) {
   const box = $("colorKey");
   if (!box) return;
-  if (CONFIG.COLOR_BY !== "meaning" || CONFIG.DOT_COLOR || !key.groups.length) { box.hidden = true; return; }
+  if (imageLook() || CONFIG.COLOR_BY !== "meaning" || CONFIG.DOT_COLOR || !key.groups.length) { box.hidden = true; return; }
   box.hidden = false;
   const rows = key.groups.map(g =>
     `<li><button type="button" data-group="${g.id}"><i style="background:${g.color}"></i>` +
@@ -382,6 +388,10 @@ async function openNote(node) {
   flyTo(node);
   track("note_open", { id: node.id });
   node.__openedAt = performance.now();
+  if (imageLook()) {                                      // photo notes: just come closer and grow
+    await tween(700, e => node.__group.scale.setScalar(1 + e * (CONFIG.OPEN_SCALE - 1)));
+    return;
+  }
   const m = node.__crumple.mesh;
   m.visible = true; m.material.opacity = 1;
   node.__crumple.setProgress(1);
@@ -396,6 +406,10 @@ async function closeNote() {
   if (!n) return;
   selected = null;
   track("note_close", { id: n.id, seconds: Math.round((performance.now() - n.__openedAt) / 1000) });
+  if (imageLook()) {
+    await tween(500, e => n.__group.scale.setScalar(CONFIG.OPEN_SCALE - e * (CONFIG.OPEN_SCALE - 1)));
+    return;
+  }
   await tween(600, e => {
     n.__crumple.setProgress(e);
     n.__group.scale.setScalar(CONFIG.OPEN_SCALE - e * (CONFIG.OPEN_SCALE - 1));

@@ -43,6 +43,7 @@ export const CONFIG = {
   START_ZOOM: 250,        // closest the camera starts (smaller = closer)
   MAX_ZOOM: 400,          // farthest it starts, when there are many notes
   ZOOM_SPEED: 1.4,        // how fast scrolling zooms (1 = normal)
+  NOTE_LOOK: "image",     // "image" = each note shows its photo; "dot" = colored dots + color key
   DOT_STYLE: "group",     // "group" = color per group (like TensorFlow), "ink" = all dark dots
   BG_COLOR: "#ffffff",    // map background (also change body background-color in index.html to match)
   // ---- GROUP NAMES ----
