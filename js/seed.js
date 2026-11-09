@@ -43,6 +43,26 @@ export const photoNotes = [
   { file: "whatever",        paper: "#efde9d", text: "I wish I could do whatever I don't wish to do." },
   { file: "grow-up-us",      paper: "#f2e09d", text: "I wish I could grow up in the US as my parents originally planned." },
   { file: "forever",         paper: "#f2e19e", text: "I wish I could live forever." },
+  // ---- added Nov 8 ----
+  { file: "be-a-plant",     paper: "#f7e9bc", text: "I wish I could be a plant" },
+  { file: "travel-world",   paper: "#edeec0", text: "I wish I could travel around the world!!" },
+  { file: "achieve-goals",  paper: "#ededc1", text: "I wish I could had the ability to achieve my goals and help others." },
+  { file: "five-languages", paper: "#eeebbf", text: "I wish I could speak 5 languages fluently" },
+  { file: "job-america",    paper: "#f1efc1", text: "I wish I could get a job in America and get H1B." },
+  { file: "quit-nicotine",  paper: "#ececbe", text: "I wish I could quit nicotine" },
+  { file: "better-person",  paper: "#edecbf", text: "I wish I could be a better person" },
+  { file: "leave-friendships", paper: "#eceabd", text: "I wish I could leave some friendships behind" },
+  { file: "rich-already",   paper: "#efecbe", text: "I wish I could be rich already" },
+  { file: "more-sleep",     paper: "#efeabd", text: "I wish I could get more than 4 hours of sleep on a regular basis. :)" },
+  { file: "broccoli",       paper: "#e8e6ba", text: "I wish I could eat broccoli!" },
+  { file: "happy-everyday", paper: "#ebe9bc", text: "I wish I could happy everyday :)" },
+  { file: "nepo-baby",      paper: "#eae8ba", text: "I wish I could be born as a nepo baby in another life" },
+  { file: "hug-mom",        paper: "#eceabc", text: "I wish I could hug my mom whenever I want to." },
+  { file: "better-health",  paper: "#ebe7bb", text: "I wish I could have better health." },
+  { file: "go-back-home",   paper: "#e7e5b9", text: "I wish I could go back home" },
+  { file: "say-no",         paper: "#eae7bb", text: "I wish I could learn how to say no to people & to myself." },
+  { file: "dance-well",     paper: "#e9e7b9", text: "I wish I could dance well." },
+  { file: "clearer-skin",   paper: "#ebe9b9", text: "I wish I could have clearer skin" },
 ];
 
 export const typedNotes = [];   // fictional notes removed — only real notes now
