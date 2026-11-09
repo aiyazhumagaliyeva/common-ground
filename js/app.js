@@ -327,6 +327,7 @@ const graph = ForceGraph3D({ controlType: "orbit" })($("map"));
 graph.width(window.innerWidth).height(window.innerHeight)
   .backgroundColor(CONFIG.BG_COLOR || "#ffffff")
   .showNavInfo(false)
+  .enableNodeDrag(false)                 // dragging always turns the whole map, never moves one note
   .nodeLabel(n => n.text)
   .nodeThreeObject(makeBall)
   .cooldownTime(2500);
@@ -868,4 +869,108 @@ async function arrive(data) {
 
 function setPos(n, v) {
   n.fx = n.x = n.tx = v.x; n.fy = n.y = n.ty = v.y; n.fz = n.z = n.tz = v.z;
+}
+
+
+// ============================================================
+//  WALKTHROUGH (Figma: home-how-to-*) + the "?" button
+//  Shows on the first visit after the intro, and any time "?" is clicked.
+//  Click anywhere to go to the next step; Esc closes it.
+// ============================================================
+const touch = matchMedia("(pointer: coarse)").matches;
+const TOUR = [
+  { id: "rotate", text: touch ? "Drag with one finger to rotate the map" : "Press and drag the mouse to rotate the map",
+    cursor: "move", from: [671, 532], to: [990, 579], textAt: [894, 837] },
+  { id: "zoom", text: touch ? "Pinch with two fingers to zoom in or zoom out" : "Slide with two fingers on the trackpad or roll the mouse roller to zoom in or zoom out",
+    image: touch ? null : "illustrations/zoom.png", textAt: [955, 648], imageAt: [955, 713, 409, 221] },
+  { id: "open", text: touch ? "Tap a note to open it" : "Click to open a note",
+    cursor: "click", from: [688, 544], textAt: [894, 837], opensNote: true },
+  { id: "add", text: touch ? "Tap here to add a note" : "Click to add a note",
+    cursor: "point", from: [756, 89], textAt: [894, 837] },
+];
+let tourStep = -1, tourNote = null, tourTimer = null;
+
+function startTour() {
+  if (document.body.classList.contains("page-open")) closeAll();
+  tourStep = -1;
+  $("tour").hidden = false;
+  document.body.classList.add("touring");
+  track("tour_start");
+  nextTourStep();
+}
+function endTour() {
+  clearTimeout(tourTimer);
+  if (tourNote) { closeNote(); tourNote = null; fitCamera(1200); }
+  controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
+  $("tour").hidden = true;
+  document.body.classList.remove("touring");
+  try { localStorage.setItem("cg:toured", "1"); } catch (e) {}
+  track("tour_end", { step: tourStep });
+}
+function nextTourStep() {
+  clearTimeout(tourTimer);
+  if (tourNote) { closeNote(); tourNote = null; fitCamera(1200); }   // back to the whole map
+  tourStep++;
+  if (tourStep >= TOUR.length) return endTour();
+  const st = TOUR[tourStep], cur = $("tourCursor"), img = $("tourImage");
+  const at = (el, x, y) => { el.style.left = `calc(${x} * var(--k))`; el.style.top = `calc(${y} * var(--k))`; };
+  $("tourText").textContent = st.text;
+  $("tourHint").textContent = `${touch ? "Tap" : "Click"} anywhere to continue · ${tourStep + 1} of ${TOUR.length}`;
+  at($("tourCopy"), st.textAt[0], st.textAt[1]);
+  // drawing (zoom step)
+  img.hidden = !st.image;
+  if (st.image) {
+    img.src = st.image;
+    at(img, st.imageAt[0], st.imageAt[1]);
+    img.style.width = `calc(${st.imageAt[2]} * var(--k))`;
+  }
+  // the white cursor (not on phones)
+  cur.hidden = !st.cursor || touch;
+  cur.className = "";
+  controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
+  if (st.cursor && !touch) {
+    cur.src = st.cursor === "click" ? "icons/cursor-click.svg" : "icons/cursor.svg";
+    at(cur, st.from[0], st.from[1]);
+    if (st.to) {                                   // rotate: the cursor drags across while the map turns
+      cur.style.setProperty("--dx", `calc(${st.to[0] - st.from[0]} * var(--k))`);
+      cur.style.setProperty("--dy", `calc(${st.to[1] - st.from[1]} * var(--k))`);
+      cur.className = "drag";
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 3;
+    } else if (st.cursor === "click") {
+      cur.className = "tap";
+    }
+  }
+  if (st.id === "rotate" && touch) { controls.autoRotate = true; controls.autoRotateSpeed = 3; }
+  // open step: after the click, the note under the cursor opens
+  if (st.opensNote) {
+    tourTimer = setTimeout(() => {
+      const n = noteNear(st.from);
+      if (n && tourStep === TOUR.indexOf(st)) { tourNote = n; openNote(n); }
+    }, 1100);
+  }
+}
+// the note closest to a point on the Figma artboard
+function noteNear([fx, fy]) {
+  const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--k")) || 1;
+  const stage = $("tourStage").getBoundingClientRect();
+  const px = stage.left + fx * k, py = stage.top + fy * k;
+  let best = null, bd = Infinity;
+  notes.forEach(n => {
+    if (!n.__group || n.__arriving) return;
+    const c = graph.graph2ScreenCoords(n.x || 0, n.y || 0, n.z || 0);
+    const d = Math.hypot(c.x - px, c.y - py);
+    if (d < bd) { bd = d; best = n; }
+  });
+  return best;
+}
+$("tour").addEventListener("click", nextTourStep);
+$("helpBtn").addEventListener("click", startTour);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("tour").hidden) endTour(); });
+
+// first visit: show it once, after the opening animation
+let toured = false;
+try { toured = localStorage.getItem("cg:toured") === "1"; } catch (e) {}
+if (CONFIG.TOUR_ON_FIRST_VISIT && !toured && !new URLSearchParams(location.search).has("mine")) {
+  setTimeout(() => { if (!document.body.classList.contains("page-open")) startTour(); }, 4200);
 }

@@ -200,6 +200,30 @@
 
     /* ---------- NOTES-ONLY VIEW: delete these 2 lines to bring the sidebar back ---------- */
     #sidebar { display: none !important; }
+    /* ---------- WALKTHROUGH (Figma: home-how-to-*): grey veil #262626 at 40%, white Helvetica 20 ---------- */
+    #tour { position: fixed; inset: 0; z-index: 6; background: rgba(38, 38, 38, 0.4); cursor: pointer; animation: tourIn 0.35s ease-out; }
+    #tour[hidden] { display: none; }
+    @keyframes tourIn { from { opacity: 0; } }
+    #tourStage { position: absolute; left: 50%; top: 50%; width: calc(1512 * var(--k)); height: calc(982 * var(--k)); transform: translate(-50%, -50%); }
+    #tourCopy { position: absolute; width: calc(463 * var(--k)); color: #fff; font-family: Helvetica, Arial, sans-serif; }
+    #tourText { font-size: max(16px, calc(20 * var(--k))); line-height: normal; margin: 0; }
+    #tourHint { font-size: max(12px, calc(14 * var(--k))); opacity: 0.7; margin: calc(10 * var(--k)) 0 0; }
+    #tourImage { position: absolute; height: auto; }
+    #tourCursor { position: absolute; width: calc(31 * var(--k)); height: auto; pointer-events: none; }
+    #tourCursor.drag { animation: tourDrag 2.4s ease-in-out infinite; }
+    #tourCursor.tap { animation: tourTap 1.1s ease-out 1 both; }
+    @keyframes tourDrag { 0%, 12% { transform: translate(0, 0) scale(1); } 18% { transform: translate(0, 0) scale(0.88); }
+      70% { transform: translate(var(--dx), var(--dy)) scale(0.88); } 78%, 100% { transform: translate(var(--dx), var(--dy)) scale(1); } }
+    @keyframes tourTap { 0% { transform: scale(1); } 60% { transform: scale(1); } 75% { transform: scale(0.8); } 100% { transform: scale(1); } }
+    body.touring #helpBtn { z-index: 7; }
+    /* the "?" button: 38 × 37, #EBEBEB at 80%, black outline, bottom right */
+    #helpBtn { all: unset; position: fixed; z-index: 3; right: max(14px, calc(31 * var(--k))); bottom: max(14px, calc(19 * var(--k)));
+      width: max(34px, calc(38 * var(--k))); height: max(33px, calc(37 * var(--k))); border-radius: 50px; cursor: pointer;
+      background: rgba(235, 235, 235, 0.8); border: 1px solid #000; display: grid; place-items: center; box-sizing: border-box; }
+    #helpBtn img { width: 100%; height: 100%; }
+    #helpBtn:focus-visible { outline: 2px solid #000; outline-offset: 3px; }
+    body.page-open #helpBtn { display: none; }
+
     /* ---------- COLOR KEY (bottom left) ---------- */
     #colorKey {
       position: fixed; z-index: 3; left: max(16px, calc(32 * var(--k))); bottom: max(16px, calc(32 * var(--k)));
@@ -332,14 +356,20 @@
     .prose a { color: inherit; }
 
     /* about-new: image + text sections */
-    .about { width: min(calc(637 * var(--k)), 90vw); margin: calc(61 * var(--k)) auto calc(100 * var(--k));
-             display: flex; flex-direction: column; gap: calc(85 * var(--k)); }
-    .about section { display: flex; flex-direction: column; gap: calc(35 * var(--k)); }
-    .about .ph { width: 100%; aspect-ratio: 637 / 342; background: #d9d9d9; object-fit: cover; display: block; }
-    .about p { font-size: max(15px, calc(20 * var(--k))); line-height: normal; text-wrap: pretty; }
-    .about p + p { margin-top: 1.2em; }
+    /* Figma "about": one 807px column, 35px between blocks, headings 24px centered, text 20px */
+    .about { width: min(calc(807 * var(--k)), 90vw); margin: calc(61 * var(--k)) auto 0;
+      padding-bottom: calc(160 * var(--k));            /* space after the last image */
+      display: flex; flex-direction: column; gap: calc(35 * var(--k)); }
+    .about h2 { font-weight: 400; font-size: max(18px, calc(24 * var(--k))); text-align: center; text-wrap: pretty; }
+    .about .ph { width: 100%; aspect-ratio: 807 / 445; background: #d9d9d9; object-fit: cover; display: block; }
+    .about p, .about li { font-size: max(15px, calc(20 * var(--k))); line-height: normal; text-wrap: pretty; }
+    .about .text p + p { margin-top: 1.2em; }
+    .about .text p.tight + p, .about .text p + p.tight { margin-top: 0; }
+    .about ol, .about ul { margin: 0; padding-left: 30px; }
+    .about ol { margin-top: 1.2em; }
+    .about .privacy { margin-top: 1.2em; font-size: max(13px, calc(15 * var(--k))); color: rgba(0,0,0,0.5); }
     .about a, .contact a { color: inherit; }
-    .contact { width: min(calc(541 * var(--k)), 88vw); margin: calc(64 * var(--k)) auto; font-size: max(15px, calc(20 * var(--k))); line-height: normal; }
+    .contact { width: min(calc(799 * var(--k)), 88vw); margin: calc(64 * var(--k)) auto; font-size: max(15px, calc(20 * var(--k))); line-height: normal; }
     .contact p + p { margin-top: 1.2em; }
 
     /* ---------- PHONES / NARROW SCREENS ---------- */
@@ -379,6 +409,16 @@
   <aside id="colorKey" aria-label="Color key" hidden></aside>
 
   <!-- ---------- NAV PILL ---------- -->
+  <!-- ---------- WALKTHROUGH (Figma: home-how-to-*) ---------- -->
+  <div id="tour" hidden>
+    <div id="tourStage">
+      <img id="tourCursor" alt="" hidden>
+      <img id="tourImage" alt="" hidden>
+      <div id="tourCopy"><p id="tourText"></p><p id="tourHint"></p></div>
+    </div>
+  </div>
+  <button type="button" id="helpBtn" aria-label="How to use Common Ground"><img src="icons/question.svg" alt=""></button>
+
   <nav id="nav">
     <span class="brand">Common Ground</span>
     <img class="divider" src="icons/divider-thin.svg" alt="">
@@ -448,28 +488,61 @@
     <button class="back" data-close aria-label="Back to the board"><img src="icons/back.svg" alt=""></button>
     <h1>About Common Ground</h1>
     <div class="about">
-      <section>
-        <div class="ph" role="img" aria-label="Image placeholder"></div>  <!-- replace with <img class="ph" src="..." alt="..."> -->
-        <div>
-          <p>Common Ground is an anonymous online board of handwritten notes. Every note finishes the same sentence: “I wish I could…” People write their wish by hand, take a photo, and upload it by scanning a QR code. There are no names, no likes, and no followers.</p>
-          <p>Each note becomes a point on a shared map. Notes about similar things end up close to each other, so groups form on their own as more people add theirs. Zoom in to read one person’s wish. Zoom out to see what people have in common.</p>
-        </div>
-      </section>
-      <section>
-        <div class="ph" role="img" aria-label="Image placeholder"></div>
-        <div>
-          <p>While working on my thesis, I was curious about how people interact with technology. Over time, the question turned into how people interact with each other through technology.</p>
-          <p>Inspired by works like “Before I Die” by Candy Chang and “This Exquisite Forest” by Aaron Koblin and Chris Milk, I wanted to make a space where people can connect anonymously over the same things, or just share their thoughts. Together, the notes build a collection of what people usually keep to themselves.</p>
-        </div>
-      </section>
-      <section>
-        <div class="ph" role="img" aria-label="Image placeholder"></div>
-        <div>
-          <p>The project started by collecting handwritten responses on sticky notes. I then designed the website in Figma and built it with HTML, CSS, and JavaScript, using a 3D graph library to place the notes in space. AI reads each note’s handwriting and wording, then places it near notes with a similar meaning.</p>
-          <p>Built by Aiya, a Communication Design student at Parsons School of Design, based in Brooklyn, NYC. She grew up practicing fine art and now works at the meeting point of design and code. See more of her work at <a href="https://aiyazhumagaliyeva.com" target="_blank" rel="noopener">aiyazhumagaliyeva.com</a></p>
-          <p class="privacy">For this research, visits are counted anonymously: where people came from, what they click, and how long they stay. No names or exact location. <button type="button" id="optOut" class="linkBtn">Don’t count my visits</button></p>
-        </div>
-      </section>
+      <p>Common Ground is a project that lets people express themselves and connect with others through a simple set of anonymous, handwritten notes. Every note finishes the same sentence: "I wish I could…" There are no names, no likes and no followers, only wishes, and the people who recognize themselves in them.</p>
+      <img class="ph" loading="lazy" src="about/process.jpg" alt="Handwritten sticky notes on a desk">   <!-- image placeholder: replace later -->
+
+      <h2>How it started</h2>
+      <div class="text">
+        <p>While working on my thesis, I was very interested in interaction. I started by researching social media: how apps are designed to keep us scrolling, and how much of what we share online is shaped to be liked. During one brainstorming session, I came to a simple conclusion: the most memorable interactions are not between people and screens, but between people. I became curious about how I could make an interactive space that would make it easier for strangers to meet and relate to each other.</p>
+        <p>Projects like <a href="https://www.candychang.com/beforeidie/" target="_blank" rel="noopener">Before I Die by Candy Chang</a> and <a href="https://experiments.withgoogle.com/this-exquisite-forest" target="_blank" rel="noopener">This Exquisite Forest by Aaron Koblin and Chris Milk</a> inspired me to turn this into a community board. A place where people can share what they usually keep to themselves, and see how others feel.</p>
+        <p>The reason I chose handwritten notes is that handwritten notes can translate a much more personal feeling and make it easier for people to connect. In the time of AI and technology, I felt that the sensibility of a handwriting and a paper texture carries a special value. Posting a hand-written note slows people down, making every note feel valuable. The first notes were collected in person on paper sticky notes (late October-early November 2026).</p>
+      </div>
+      <img class="ph" loading="lazy" src="about/process.jpg" alt="">
+
+      <h2>How it works</h2>
+      <div class="text">
+        <p>Common Ground is built on the same logic as <a href="https://projector.tensorflow.org/" target="_blank" rel="noopener">Google's TensorFlow Embedding Projector</a>, a tool that shows how an AI groups meaning in 3D. The site reads each note, understands what it means, and places it in a 3D space next to notes with a similar meaning.</p>
+        <ol>
+          <li>You write your wish on paper and scan the QR code with your phone.</li>
+          <li>AI reads your handwriting (Google Cloud Vision), and you check that it read it correctly.</li>
+          <li>Your note is sent to be reviewed by our moderator. Everyone else sees it once it's approved.</li>
+          <li>A second AI model reads what your wish means. It turns each wish into numbers that describe its meaning, and it runs in your browser.</li>
+          <li>Your note is placed near notes with a similar meaning. As more notes appear, groups start to form based on submitted notes. Groups form from a minimum of 3 wishes to start a group.</li>
+        </ol>
+      </div>
+      <img class="ph" loading="lazy" src="about/process.jpg" alt="">
+
+      <h2>Care and privacy</h2>
+      <div class="text">
+        <p>All notes are anonymous. Please don't include names or contact details.</p>
+        <p class="tight">Every submission is reviewed by me before it appears on the map.</p>
+        <ul>
+          <li>Notes that could reveal personal information are never made public.</li>
+          <li>Notes about self-harm are never posted. The writer is shown where to find support instead.</li>
+          <li>Visits are counted anonymously for research: where people came from and what they click, with no names or exact location.</li>
+        </ul>
+        <p class="privacy"><button type="button" id="optOut" class="linkBtn">Don’t count my visits</button></p>
+      </div>
+      <img class="ph" loading="lazy" src="about/process.jpg" alt="">
+
+      <h2>Inspirations</h2>
+      <div class="text">
+        <ul>
+          <li>Before I Die by Candy Chang (2011): a public chalkboard wall in New Orleans, now in over 75 countries.</li>
+          <li>Subway Therapy by Matthew Chavez (2016): sticky notes in NYC subway stations.</li>
+          <li>We Feel Fine by Jonathan Harris and Sep Kamvar (2006).</li>
+          <li>This Exquisite Forest by Aaron Koblin and Chris Milk (Google).</li>
+          <li>Google's TensorFlow Embedding Projector.</li>
+        </ul>
+      </div>
+      <img class="ph" loading="lazy" src="about/process.jpg" alt="">
+
+      <h2>About me</h2>
+      <div class="text">
+        <p class="tight">I'm Aiya, a senior in Communication Design at Parsons School of Design, based in Brooklyn. Common Ground is part of my thesis, where I explore how people can connect through technology and what happens when personal, offline expression meets online data. I grew up practicing fine art, and I now work where design, code and people meet. I researched and designed this project in Figma and built it with HTML, CSS and JavaScript, using a 3D graph library and Claude Code (an AI coding tool).</p>
+        <p class="tight">More of my work: <a href="https://aiyazhumagaliyeva.com" target="_blank" rel="noopener">aiyazhumagaliyeva.com</a></p>
+      </div>
+      <img class="ph" loading="lazy" src="about/aiya.jpg" alt="Aiya">
     </div>
   </section>
 
@@ -479,7 +552,7 @@
     <h1>Contact Us</h1>
     <div class="contact">
       <p>You can find us on <a href="#" target="_blank" rel="noopener">Instagram</a>.</p>   <!-- add the Instagram link in href -->
-      <p>If you have any questions or want your note to be removed, you can <a href="mailto:">email us</a> too.</p>   <!-- add your email after mailto: -->
+      <p>If you have any questions or want your note to be removed, you can <a href="mailto:">Email us</a> too.</p>   <!-- add your email after mailto: -->
     </div>
   </section>
 
