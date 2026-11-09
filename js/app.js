@@ -777,8 +777,7 @@ async function startHandoff() {
 
   // 2. BACKUP (Apps Script): asks Google every 1.5 s
   fetch(CONFIG.SERVER_URL + "?action=version").then(r => r.json()).then(v => {
-    if (!(v.version >= 4) && !liveOn()) $("addStatus").textContent =
-      "Heads up: the server script is out of date, so a note sent from a phone won't show up here. Update Code.gs in Apps Script and deploy a new version.";
+    if (!(v.version >= 4)) console.warn("Common Ground: the server script (Code.gs) is out of date. Phones can't send notes to this screen until a new version is deployed.");
   }).catch(() => {});
   pollTimer = setInterval(async () => {
     try {

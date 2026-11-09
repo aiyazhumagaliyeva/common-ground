@@ -294,15 +294,13 @@
       font-size: max(14px, calc(20 * var(--k))); max-width: calc(400 * var(--k));
     }
     .qrCard { display: flex; flex-direction: column; align-items: center; gap: calc(17 * var(--k)); align-self: center; }
-    .qrCard .box {
-      width: calc(304 * var(--k)); aspect-ratio: 304 / 295; border-radius: calc(40 * var(--k));
-      background: #d9d9d9; overflow: hidden; display: flex; flex-direction: column;
-    }
-    .qrCard .bar { height: calc(69 * var(--k)); background: #c4c4c4; flex-shrink: 0; }
-    .qrCard .inner { flex: 1; display: flex; align-items: center; justify-content: center; padding: calc(16 * var(--k)); text-align: center; }
-    #qr { width: calc(196 * var(--k)); height: calc(196 * var(--k)); }
+    /* Figma (add yours-new, Frame 27): just the QR, 218 × 218, no card */
+    .qrCard .box { display: flex; flex-direction: column; min-width: calc(218 * var(--k)); min-height: calc(218 * var(--k)); }
+    .qrCard .bar { display: none; }
+    .qrCard .inner { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; }
+    #qr { width: calc(218 * var(--k)); height: calc(218 * var(--k)); }
     #qr[hidden] { display: none; }
-    .qrCard .caption { font-size: max(13px, calc(16 * var(--k))); text-align: center; }
+    .qrCard .caption { font-size: max(14px, calc(20 * var(--k))); text-align: center; }
     #addStatus { font-size: max(12px, calc(14 * var(--k))); color: rgba(0,0,0,0.55); text-align: center; min-height: 1.2em; }
     .cameraBtn { display: block; text-align: center; padding: 14px 28px; border-radius: 40px; background: #111; color: #fff; text-decoration: none; font-size: 17px; }
     .cameraBtn[hidden] { display: none; }
