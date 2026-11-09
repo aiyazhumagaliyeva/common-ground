@@ -47,11 +47,12 @@ export const CONFIG = {
   // ---- how a note looks as paper ----
   NOTE_TILT: 5,           // random tilt of each note, in degrees (0 = straight)
   NOTE_SHADOW: true,      // soft shadow under each note
-  NOTE_CURL: true,        // folded bottom-right corner
-  NOTE_GAP: 1.15,         // space between notes (1 = edges touch). Bigger = more spread out
+  NOTE_CURL: false,       // folded bottom-right corner
+  NOTE_GAP: 0,            // space between notes (0 = off, 1 = edges touch). Bigger = more spread out
   PAPER_BY_GROUP: true,   // each group gets its own sticky-note paper color
+  TINT_STRENGTH: 0.35,    // how strong the group color is (0 = original paper, 1 = full color)
   GROUP_PAPERS: ["#FFF27A", "#FFB8DA", "#AEE3FF", "#BDF2AE", "#FFD29A", "#D9C6FF", "#FFADAD"],  // yellow, pink, blue, green, orange, purple, red
-  NO_GROUP_PAPER: "#F5F2E8",  // notes with no group: soft off-white ("" = keep the original yellow)
+  NO_GROUP_PAPER: "",      // notes with no group: soft off-white ("" = keep the original yellow)
   DOT_STYLE: "group",     // "group" = color per group (like TensorFlow), "ink" = all dark dots
   BG_COLOR: "#ffffff",    // map background (also change body background-color in index.html to match)
   // ---- GROUP NAMES ----

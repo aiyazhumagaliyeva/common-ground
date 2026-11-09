@@ -174,7 +174,10 @@ function paintLook(n) {
     const d = tg.getImageData(0, 0, S, S), px = d.data;
     const pr = rgbOf(n.paper || "#e6d69c"), tr = rgbOf(tint);
     for (let i = 0; i < px.length; i += 4) {
-      for (let k = 0; k < 3; k++) px[i + k] = Math.min(1, px[i + k] / pr[k]) * tr[k];
+      for (let k = 0; k < 3; k++) {
+        const tinted = Math.min(1, px[i + k] / pr[k]) * tr[k];
+        px[i + k] = px[i + k] + (tinted - px[i + k]) * CONFIG.TINT_STRENGTH;   // weaker = closer to the original paper
+      }
     }
     tg.putImageData(d, 0, 0);
   }
