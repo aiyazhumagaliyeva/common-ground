@@ -216,7 +216,9 @@ function paintDot(n) {
     paintLook(n);
     m.map = n.__lookTex; m.color.set("#ffffff"); m.needsUpdate = true;
     m.rotation = hashUnit(n.id, 7) * (CONFIG.NOTE_TILT * Math.PI / 180);   // a slight tilt
-    n.__dot.scale.setScalar(CONFIG.NOTE_SIZE * LOOK / (LOOK - LOOK_PAD * 2));
+    n.__baseScale = CONFIG.NOTE_SIZE * LOOK / (LOOK - LOOK_PAD * 2);
+    n.__dot.scale.setScalar(n.__baseScale);
+    m.depthWrite = false;                                 // faded notes don't hide the ones behind
     return;
   }
   const grad = CONFIG.COLOR_BY === "meaning" && !CONFIG.DOT_COLOR && CONFIG.DOT_STYLE !== "ink" && n.blend > 0;
@@ -282,7 +284,8 @@ function makeBall(node) {
     dot.visible = false;
     group.scale.setScalar(CONFIG.ARRIVE_SCALE);
   } else if (introPending) {
-    group.scale.setScalar(0.001);                        // pops in during the intro
+    if (CONFIG.INTRO_STYLE === "gather") dot.material.opacity = 0;   // fades in while flying to its place
+    else group.scale.setScalar(0.001);                   // pops in during the intro
   }
   return group;
 }
@@ -347,6 +350,21 @@ controls.autoRotate = true;           // slow drift until someone touches the ma
 controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
 controls.addEventListener("start", () => (controls.autoRotate = false));
 
+// ---- closest notes in meaning (like TensorFlow's "nearest neighbors") ----
+function neighbors(n, k) {
+  if (!n || !n.vec) return [];
+  const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+  return notes.filter(o => o !== n && o.vec && o.__group)
+    .map(o => [dot(n.vec, o.vec), o]).sort((a, b) => b[0] - a[0]).slice(0, k).map(x => x[1]);
+}
+let hovered = null, focus = null, focusSet = new Set();
+function updateFocus() {
+  const f = CONFIG.HOVER_NEIGHBORS ? (selected || hovered) : null;   // an open note wins over hover
+  if (f === focus) return;
+  focus = f;
+  focusSet = new Set(neighbors(f, CONFIG.HOVER_NEIGHBORS));
+}
+
 // ---- every frame: dots float gently; paper faces you ----
 function tick(now) {
   const cam = graph.camera(), t = now / 1000;
@@ -354,8 +372,29 @@ function tick(now) {
     const g = n.__group;
     if (!g) return;
     g.quaternion.copy(cam.quaternion);                    // paper always faces the camera
-    const bob = Math.sin(t * 0.8 + n.__phase) * CONFIG.NOTE_SIZE * CONFIG.FLOAT;
-    n.__dot.position.y = bob;
+    const d = n.__dot;
+    if (CONFIG.FLOAT_EACH) {                              // 5. each note floats on its own, slowly
+      const A = CONFIG.NOTE_SIZE * CONFIG.FLOAT_EACH, ph = n.__phase;
+      d.position.set(Math.sin(t * 0.37 + ph) * A, Math.sin(t * 0.29 + ph * 1.7) * A, Math.sin(t * 0.23 + ph * 2.3) * A);
+    } else {
+      d.position.y = Math.sin(t * 0.8 + n.__phase) * CONFIG.NOTE_SIZE * CONFIG.FLOAT;
+    }
+    if (!n.__arriving && d.visible && !(n.__crumple.mesh.visible)) {
+      // 1. hover: the note and its closest notes stay bright, the rest fade back
+      let op = 1, grow = 1;
+      if (focus) {
+        if (n === focus) grow = 1.15;
+        else if (focusSet.has(n)) grow = 1.07;
+        else op = 0.15;
+      }
+      // 4. depth: notes far behind the middle fade toward the background
+      if (CONFIG.DEPTH_FADE) {
+        const far = cam.position.distanceTo(g.position) / (cam.position.distanceTo(controls.target) || 1);
+        op *= 1 - CONFIG.DEPTH_FADE * Math.min(1, Math.max(0, (far - 0.85) / 0.9));
+      }
+      d.material.opacity += (op - d.material.opacity) * 0.12;
+      if (n.__baseScale) d.scale.setScalar(d.scale.x + (n.__baseScale * grow - d.scale.x) * 0.15);
+    }
     const m = n.__crumple.mesh;
     if (m.visible && n.__crumple.progress >= 0.999 && !n.__arriving) {
       m.rotation.x += 0.004; m.rotation.y += 0.006;      // a crumpled ball tumbles a bit
@@ -394,7 +433,7 @@ function animateToTargets(ms = 1600) {
 }
 
 // ---- regroup everything (after load, and after every new note) ----
-function regroup() {
+function regroup(ms = 1600) {
   const known = notes.filter(n => n.vec);
   const count = layout(known);
   notes.forEach(n => {                                   // not read yet: wait near the middle
@@ -404,7 +443,7 @@ function regroup() {
   const key = colorByMeaning(notes);                      // colors follow meaning
   notes.forEach(paintDot);
   drawKey(key);
-  animateToTargets();
+  animateToTargets(ms);
   $("mapInfo").textContent = count === 0
     ? `${notes.length} wishes · no groups yet`
     : `${notes.length} wishes · ${count} groups have formed`;
@@ -460,10 +499,12 @@ function flyTo(node) {
 
 // ---- click a ball: it flies close and unfolds into the note ----
 let selected = null;
-async function openNote(node) {
+async function openNote(node, fromReader = false) {
   if (selected === node || node.__arriving) return;
-  if (selected) closeNote();
+  if (selected) closeNote(true);
   selected = node;
+  updateFocus();
+  showReader(node, fromReader);
   controls.autoRotate = false;
   flyTo(node);
   track("note_open", { id: node.id });
@@ -481,10 +522,12 @@ async function openNote(node) {
     node.__group.scale.setScalar(1 + e * (CONFIG.OPEN_SCALE - 1));
   });
 }
-async function closeNote() {
+async function closeNote(keepReader = false) {
   const n = selected;
   if (!n) return;
   selected = null;
+  updateFocus();
+  if (!keepReader) hideReader();
   track("note_close", { id: n.id, seconds: Math.round((performance.now() - n.__openedAt) / 1000) });
   if (imageLook()) {
     await tween(500, e => n.__group.scale.setScalar(CONFIG.OPEN_SCALE - e * (CONFIG.OPEN_SCALE - 1)));
@@ -496,13 +539,50 @@ async function closeNote() {
   });
   await paperToDot(n, 400);
 }
-graph.onNodeClick(openNote);
-graph.onBackgroundClick(closeNote);
+graph.onNodeClick(n => openNote(n));
+graph.onNodeHover(n => {
+  hovered = n && !n.__arriving ? n : null;
+  document.body.style.cursor = hovered ? "pointer" : "";
+  updateFocus();
+});
+graph.onBackgroundClick(() => closeNote());
+
+// ---- 2. READING PANEL: the note's words + step through similar wishes ----
+let readerList = [], readerIdx = 0;
+function showReader(n, fromReader) {
+  if (!CONFIG.READING_PANEL) return;
+  if (!fromReader) { readerList = [n, ...neighbors(n, CONFIG.SIMILAR_COUNT)]; readerIdx = 0; }
+  $("readerText").textContent = n.text;
+  $("readerInfo").textContent = readerIdx === 0
+    ? `${readerList.length - 1} similar wishes`
+    : `Similar wish ${readerIdx} of ${readerList.length - 1}`;
+  $("readerPrev").disabled = readerIdx === 0;
+  $("readerNext").disabled = readerIdx >= readerList.length - 1;
+  $("reader").hidden = false;
+}
+function hideReader() { $("reader").hidden = true; }
+function step(dir) {
+  const i = readerIdx + dir;
+  if (i < 0 || i >= readerList.length) return;
+  readerIdx = i;
+  track("reader_step", { dir, i });
+  openNote(readerList[i], true);
+}
+$("readerPrev").addEventListener("click", () => step(-1));
+$("readerNext").addEventListener("click", () => step(1));
+$("readerClose").addEventListener("click", () => closeNote());
+document.addEventListener("keydown", e => {
+  if ($("reader").hidden) return;
+  if (e.key === "ArrowRight") step(1);
+  if (e.key === "ArrowLeft") step(-1);
+});
+makeGlass($("reader"));
 
 // ---- opening animation: balls pop out of the middle into their groups ----
 function intro() {
   introPending = false;
   fitCamera(2600);
+  if (CONFIG.INTRO_STYLE === "gather") return;         // notes fly in from everywhere (see start)
   notes.forEach((n, i) => {
     if (!n.__group) return;
     setTimeout(() => tween(800, e => n.__group.scale.setScalar(Math.max(0.001, e)), easeOutBack), 250 + i * 45);
@@ -525,7 +605,13 @@ async function start() {
   }
   // 1. show the map right away with the notes we already understand
   notes.forEach(n => (n.vec = knownVector(n.text)));
-  regroup();
+  if (CONFIG.INTRO_STYLE === "gather") {               // 6. start scattered far away, then find their places
+    notes.forEach(n => {
+      const v = new THREE.Vector3(rnd(), rnd(), rnd()).normalize().multiplyScalar(CONFIG.MAP_RADIUS * (2.2 + Math.random()));
+      n.fx = n.x = v.x; n.fy = n.y = v.y; n.fz = n.z = v.z;
+    });
+  }
+  regroup(CONFIG.INTRO_STYLE === "gather" ? 3200 : 1600);
   intro();
   showMyNote();
   track("map_ready", { notes: notes.length, ms: Math.round(performance.now()) });
