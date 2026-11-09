@@ -48,7 +48,7 @@ export const CONFIG = {
   ZOOM_SPEED: 1.4,        // how fast scrolling zooms (1 = normal)
   NOTE_LOOK: "image",     // "image" = each note shows its photo; "dot" = colored dots + color key
   // ---- how a note looks as paper ----
-  NOTE_TILT: 0,           // random tilt of each note, in degrees (0 = straight)
+  NOTE_TILT: 5,           // random tilt of each note, in degrees (0 = straight)
   NOTE_SHADOW: true,      // soft shadow under each note
   NOTE_CURL: false,       // folded bottom-right corner
   NOTE_GAP: 0,            // space between notes (0 = off, 1 = edges touch). Bigger = more spread out
