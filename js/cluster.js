@@ -199,6 +199,24 @@ export function layout(notes) {
     });
   });
 
+  // --- "projector" layout: one continuous cloud like TensorFlow ---
+  // Every note sits where its own meaning puts it (PCA), not on a group island.
+  // GROUP_PULL gently pulls notes of the same group toward each other (0 = pure PCA).
+  if (CONFIG.LAYOUT_STYLE === "projector") {
+    const P = centered.map(v => project(v, pcs));
+    const radii = P.map(len3).sort((a, b) => a - b);
+    const R = radii[Math.floor(radii.length * 0.9)] || 1;      // ignore the few extreme notes
+    const k = CONFIG.MAP_RADIUS / R;
+    const gMean = groups.map(g => [0, 1, 2].map(d => g.reduce((t, i) => t + P[i][d], 0) / g.length));
+    notes.forEach((n, i) => {
+      let q = P[i];
+      if (n.group >= 0 && CONFIG.GROUP_PULL) q = q.map((v, d) => v + (gMean[n.group][d] - v) * CONFIG.GROUP_PULL);
+      n.tx = q[0] * k + hash(n.id, 1) * CONFIG.NOTE_SIZE * 0.6;
+      n.ty = q[1] * k + hash(n.id, 2) * CONFIG.NOTE_SIZE * 0.6;
+      n.tz = q[2] * k + hash(n.id, 3) * CONFIG.NOTE_SIZE * 0.6;
+    });
+  }
+
   // --- keep notes from sitting inside each other (groups stay together) ---
   const minD = CONFIG.NOTE_SIZE * (CONFIG.NOTE_GAP || 0);
   if (minD > 0) {

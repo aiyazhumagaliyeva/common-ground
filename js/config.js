@@ -35,6 +35,9 @@ export const CONFIG = {
   MIN_GROUP_SIZE: 3,
 
   // ---- LAYOUT (3D units) ----
+  LAYOUT_STYLE: "projector", // "projector" = one continuous cloud (like TensorFlow); "islands" = each group on its own island
+  MAP_RADIUS: 130,        // projector: size of the whole cloud
+  GROUP_PULL: 0.3,        // projector: how much notes of one group pull together (0 = none, 1 = tight)
   MIDDLE_RADIUS: 55,      // size of the general middle cloud
   GROUP_DISTANCE: 40,    // how far groups sit from the middle
   GROUP_SPACING: 100,     // minimum distance between two groups
@@ -49,7 +52,7 @@ export const CONFIG = {
   NOTE_SHADOW: true,      // soft shadow under each note
   NOTE_CURL: false,       // folded bottom-right corner
   NOTE_GAP: 0,            // space between notes (0 = off, 1 = edges touch). Bigger = more spread out
-  PAPER_BY_GROUP: true,   // each group gets its own sticky-note paper color
+  PAPER_BY_GROUP: false,   // each group gets its own sticky-note paper color
   TINT_STRENGTH: 0.35,    // how strong the group color is (0 = original paper, 1 = full color)
   GROUP_PAPERS: ["#FFF27A", "#FFB8DA", "#AEE3FF", "#BDF2AE", "#FFD29A", "#D9C6FF", "#FFADAD"],  // yellow, pink, blue, green, orange, purple, red
   NO_GROUP_PAPER: "",      // notes with no group: soft off-white ("" = keep the original yellow)
