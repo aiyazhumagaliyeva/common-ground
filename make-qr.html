@@ -23,6 +23,9 @@
     table { width: 100%; border-collapse: collapse; margin-top: 40px; font-size: 13px; }
     td, th { text-align: left; padding: 8px 6px; border-bottom: 1px solid #eee; }
     th { color: rgba(0,0,0,0.55); font-weight: 400; }
+    .preset { display: flex; flex-direction: column; gap: 6px; padding: 16px; border: 1px solid #000; border-radius: 16px; margin-bottom: 8px; font-size: 14px; }
+    .preset span { color: rgba(0,0,0,0.6); line-height: 1.4; }
+    .preset button { align-self: flex-start; margin-top: 6px; background: #111; color: #fff; }
     h2 { font-size: 18px; font-weight: 400; margin: 40px 0 4px; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
     input[type=range] { padding: 0; border: 0; accent-color: #111; }
@@ -42,6 +45,12 @@
     <h1>QR & link maker</h1>
     <p class="lead">Every poster and post gets its own code, so the "events" tab in your Sheet shows where each visitor came from. Below, you can change how the QR looks. Only for you; this page isn't linked anywhere.</p>
 
+    <div class="preset">
+      <b>Camera QR</b>
+      <span>Opens the phone camera page, the same page as the QR on "Add a note". Use it in Figma, slides or on a printed card.</span>
+      <button type="button" id="cameraQR">Make the camera QR</button>
+    </div>
+
     <label for="type">Where will people see it?</label>
     <select id="type">
       <option value="poster">Poster (QR on the street)</option>
@@ -53,6 +62,7 @@
       <option value="website">Another website (portfolio…)</option>
       <option value="event">Event / exhibition</option>
       <option value="other">Other</option>
+      <option value="none">No tag (plain link)</option>
     </select>
 
     <label for="place">Name or area (optional)</label>
@@ -129,13 +139,16 @@
 <script type="module">
   import { drawQR, QR_STYLE } from './js/qr.js';
   const $ = id => document.getElementById(id);
-  const BASE = location.origin + location.pathname.replace(/make-qr\.html$/, "");
+  import { CONFIG } from './js/config.js';
+  // always the real website (not 127.0.0.1 from Go Live), so phones can open it
+  const BASE = CONFIG.PHONE_URL.replace(/phone\.html$/, "");
 
   const slug = t => t.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9\-_]/g, "").slice(0, 40);
   function current() {
     const place = slug($("place").value);
-    const code = $("type").value + (place ? "-" + place : "");
-    const link = BASE + $("target").value + "?src=" + code;
+    const type = $("type").value;
+    const code = type === "none" ? (place || "") : type + (place ? "-" + place : "");
+    const link = BASE + $("target").value + (code ? "?src=" + code : "");
     return { code, link };
   }
   let checkId = 0;
@@ -171,6 +184,12 @@
     checkScan(link);
   }
   ["type", "place", "target"].forEach(id => $(id).addEventListener("input", update));
+  // one click: the camera QR (opens phone.html)
+  $("cameraQR").onclick = () => {
+    $("type").value = "none"; $("place").value = ""; $("target").value = "phone.html";
+    update();
+    $("qr").scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   [...KEYS, "clear"].forEach(id => $(id).addEventListener("input", () => { readLook(); update(); }));
   $("reset").onclick = () => { look = { ...QR_STYLE }; try { localStorage.removeItem("cg:qrlook"); } catch (e) {} fill(); update(); };
   update();
@@ -218,6 +237,7 @@
 
   $("copy").onclick = async () => { await navigator.clipboard.writeText(current().link); remember(); $("copy").textContent = "Copied"; setTimeout(() => $("copy").textContent = "Copy link", 1200); };
 
+  const fileName = () => current().code || ($("target").value ? "camera" : "map");
   function download(name, blob) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = name; a.click();
@@ -226,7 +246,7 @@
   $("svg").onclick = () => {
     remember();
     const svg = $("qr").querySelector("svg").outerHTML;
-    download(`qr-${current().code}.svg`, new Blob([svg], { type: "image/svg+xml" }));
+    download(`qr-${fileName()}.svg`, new Blob([svg], { type: "image/svg+xml" }));
   };
   $("png").onclick = () => {
     remember();
@@ -236,7 +256,7 @@
       const c = document.createElement("canvas"); c.width = c.height = 2000;
       const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, 2000, 2000);
       g.drawImage(img, 0, 0, 2000, 2000);
-      c.toBlob(b => download(`qr-${current().code}.png`, b), "image/png");
+      c.toBlob(b => download(`qr-${fileName()}.png`, b), "image/png");
     };
     img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
   };
