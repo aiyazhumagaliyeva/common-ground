@@ -548,7 +548,7 @@
     function showProblem(msg) { const el = document.getElementById("mapInfo"); el.classList.add("problem"); el.textContent = "Problem: " + msg; }
     window.addEventListener("error", e => showProblem((e.message || "a file failed to load") + (e.filename ? " (" + e.filename.split("/").pop() + ")" : "")), true);
     window.addEventListener("unhandledrejection", e => showProblem(String(e.reason && e.reason.message || e.reason)));
-    setTimeout(() => { if (!window.appStarted) showProblem("the code didn't start. Is the js folder next to index.html?"); }, 6000);
+    setTimeout(() => { if (!window.appStarted) showProblem("the code didn't start. Is the js folder next to index.html?"); }, 20000);
   </script>
   <script type="module">
     // load the app and show the real error on the page if it fails

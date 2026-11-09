@@ -338,7 +338,7 @@ graph.cameraPosition({ x: 0, y: 0, z: CONFIG.MAX_ZOOM * 1.8 });    // intro star
 
 // zoom goes toward where the mouse points, so far-away notes are easy to reach
 const controls = graph.controls();
-controls.zoomToCursor = true;
+controls.zoomToCursor = CONFIG.ZOOM_TO_MOUSE;   // false = zoom toward the middle, so the map stays centered
 controls.screenSpacePanning = true;
 controls.zoomSpeed = CONFIG.ZOOM_SPEED;
 controls.minDistance = 15;          // how close you can get to a note
@@ -405,9 +405,7 @@ function regroup() {
   notes.forEach(paintDot);
   drawKey(key);
   animateToTargets();
-  $("mapInfo").textContent = count === 0
-    ? `${notes.length} wishes · no groups yet`
-    : `${notes.length} wishes · ${count} groups have formed`;
+  // (no status text in the corner)
 }
 
 // ---- the color key (bottom left) ----
@@ -511,7 +509,6 @@ function intro() {
 
 // ---- start: load saved notes, read meaning, arrange ----
 async function start() {
-  $("mapInfo").textContent = "Reading the wishes…";
   if (serverOn) {
     try {
       const res = await fetch(CONFIG.SERVER_URL + "?action=approved");
@@ -539,7 +536,7 @@ async function start() {
     regroup();
   } catch (e) {
     console.error(e);
-    $("mapInfo").textContent = "Could not load the AI model (check internet). New notes stay in the middle.";
+    console.warn("Could not load the AI model. New notes stay in the middle.");
   }
 }
 start();

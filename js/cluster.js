@@ -240,9 +240,9 @@ export function layout(notes) {
   }
 
   // --- center the whole map, so it always sits in the middle of the screen (like TensorFlow) ---
-  const cx = notes.reduce((t, n) => t + n.tx, 0) / notes.length;
-  const cy = notes.reduce((t, n) => t + n.ty, 0) / notes.length;
-  const cz = notes.reduce((t, n) => t + n.tz, 0) / notes.length;
+  // (middle of the outer edges, so the cloud looks centered on screen)
+  const mid = k => (Math.min(...notes.map(n => n[k])) + Math.max(...notes.map(n => n[k]))) / 2;
+  const cx = mid("tx"), cy = mid("ty"), cz = mid("tz");
   notes.forEach(n => { n.tx -= cx; n.ty -= cy; n.tz -= cz; });
 
   return groups.length;
