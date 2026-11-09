@@ -44,6 +44,14 @@ export const CONFIG = {
   MAX_ZOOM: 400,          // farthest it starts, when there are many notes
   ZOOM_SPEED: 1.4,        // how fast scrolling zooms (1 = normal)
   NOTE_LOOK: "image",     // "image" = each note shows its photo; "dot" = colored dots + color key
+  // ---- how a note looks as paper ----
+  NOTE_TILT: 5,           // random tilt of each note, in degrees (0 = straight)
+  NOTE_SHADOW: true,      // soft shadow under each note
+  NOTE_CURL: true,        // folded bottom-right corner
+  NOTE_GAP: 1.15,         // space between notes (1 = edges touch). Bigger = more spread out
+  PAPER_BY_GROUP: true,   // each group gets its own sticky-note paper color
+  GROUP_PAPERS: ["#FFF27A", "#FFB8DA", "#AEE3FF", "#BDF2AE", "#FFD29A", "#D9C6FF", "#FFADAD"],  // yellow, pink, blue, green, orange, purple, red
+  NO_GROUP_PAPER: "#F5F2E8",  // notes with no group: soft off-white ("" = keep the original yellow)
   DOT_STYLE: "group",     // "group" = color per group (like TensorFlow), "ink" = all dark dots
   BG_COLOR: "#ffffff",    // map background (also change body background-color in index.html to match)
   // ---- GROUP NAMES ----

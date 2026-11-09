@@ -199,5 +199,27 @@ export function layout(notes) {
     });
   });
 
+  // --- keep notes from sitting inside each other (groups stay together) ---
+  const minD = CONFIG.NOTE_SIZE * (CONFIG.NOTE_GAP || 0);
+  if (minD > 0) {
+    for (let it = 0; it < 60; it++) {
+      let moved = false;
+      for (let a = 0; a < notes.length; a++) {
+        for (let b = a + 1; b < notes.length; b++) {
+          const A = notes[a], B = notes[b];
+          let dx = A.tx - B.tx, dy = A.ty - B.ty, dz = A.tz - B.tz;
+          let d = Math.hypot(dx, dy, dz);
+          if (d >= minD) continue;
+          if (d < 1e-6) { dx = hash(A.id, 4); dy = hash(A.id, 5); dz = hash(A.id, 6); d = Math.hypot(dx, dy, dz) || 1; }
+          const push = (minD - d) / 2 / d;
+          A.tx += dx * push; A.ty += dy * push; A.tz += dz * push;
+          B.tx -= dx * push; B.ty -= dy * push; B.tz -= dz * push;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+  }
+
   return groups.length;
 }

@@ -133,12 +133,87 @@ function gradientTexture(a, b, blend) {
   return t;
 }
 const imageLook = () => CONFIG.NOTE_LOOK === "image";
+
+// ============================================================
+//  THE NOTE AS PAPER: shadow, curled corner, paper color by group
+//  (drawn into its own picture, so the original photo stays untouched)
+// ============================================================
+const LOOK = 512, LOOK_PAD = 40;                          // extra room around the paper for the shadow
+const hashUnit = (id, k) => {                             // stable number between -1 and 1 per note
+  let h = 2166136261 ^ k;
+  for (const ch of String(id)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return ((h >>> 0) % 20001) / 10000 - 1;
+};
+const rgbOf = hex => { const v = parseInt(hex.slice(1), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
+
+function paperTint(n) {
+  if (!CONFIG.PAPER_BY_GROUP) return "";
+  if (n.group >= 0) return CONFIG.GROUP_PAPERS[n.group % CONFIG.GROUP_PAPERS.length];
+  return CONFIG.NO_GROUP_PAPER;
+}
+
+function paintLook(n) {
+  if (!n.__lookCtx) {
+    const c = document.createElement("canvas"); c.width = c.height = LOOK;
+    n.__lookCtx = c.getContext("2d");
+    n.__lookTex = new THREE.CanvasTexture(c);
+    n.__lookTex.colorSpace = THREE.SRGBColorSpace;
+  }
+  const tint = paperTint(n);
+  const loaded = !n.__img || (n.__img.complete && n.__img.naturalWidth > 0);
+  const key = tint + "|" + loaded;
+  if (n.__lookKey === key) return;                       // nothing changed
+  n.__lookKey = key;
+
+  const S = LOOK - LOOK_PAD * 2;
+  // 1. the photo, re-colored: the paper becomes the group's paper color, the ink stays ink
+  const t = document.createElement("canvas"); t.width = t.height = S;
+  const tg = t.getContext("2d", { willReadFrequently: true });
+  tg.drawImage(n.__ctx.canvas, 0, 0, S, S);
+  if (tint && loaded && n.image) {
+    const d = tg.getImageData(0, 0, S, S), px = d.data;
+    const pr = rgbOf(n.paper || "#e6d69c"), tr = rgbOf(tint);
+    for (let i = 0; i < px.length; i += 4) {
+      for (let k = 0; k < 3; k++) px[i + k] = Math.min(1, px[i + k] / pr[k]) * tr[k];
+    }
+    tg.putImageData(d, 0, 0);
+  }
+
+  // 2. the paper shape with a curled bottom-right corner, and its shadow
+  const g = n.__lookCtx, x = LOOK_PAD, y = LOOK_PAD, f = CONFIG.NOTE_CURL ? S * 0.09 : 0;
+  g.clearRect(0, 0, LOOK, LOOK);
+  const shape = () => {
+    g.beginPath();
+    g.moveTo(x, y); g.lineTo(x + S, y); g.lineTo(x + S, y + S - f);
+    g.lineTo(x + S - f, y + S); g.lineTo(x, y + S); g.closePath();
+  };
+  if (CONFIG.NOTE_SHADOW) {
+    g.save();
+    g.shadowColor = "rgba(0,0,0,0.22)"; g.shadowBlur = 26; g.shadowOffsetY = 12;
+    shape(); g.fillStyle = "#fff"; g.fill();
+    g.restore();
+  }
+  g.save(); shape(); g.clip(); g.drawImage(t, x, y); g.restore();
+  if (f) {                                                // the folded-over corner
+    const c = tint || n.paper || "#e6d69c";
+    const grad = g.createLinearGradient(x + S - f, y + S - f, x + S - f / 2, y + S - f / 2);
+    grad.addColorStop(0, c); grad.addColorStop(1, "#ffffff");
+    g.save();
+    g.shadowColor = "rgba(0,0,0,0.25)"; g.shadowBlur = 6; g.shadowOffsetX = -2; g.shadowOffsetY = -2;
+    g.beginPath(); g.moveTo(x + S, y + S - f); g.lineTo(x + S - f, y + S - f); g.lineTo(x + S - f, y + S); g.closePath();
+    g.fillStyle = grad; g.fill();
+    g.restore();
+  }
+  n.__lookTex.needsUpdate = true;
+}
 function paintDot(n) {
   const m = n.__dot && n.__dot.material;
   if (!m) return;
   if (imageLook()) {                                      // the note's photo, flat, always facing you
-    m.map = n.__tex; m.color.set("#ffffff"); m.needsUpdate = true;
-    n.__dot.scale.setScalar(CONFIG.NOTE_SIZE);
+    paintLook(n);
+    m.map = n.__lookTex; m.color.set("#ffffff"); m.needsUpdate = true;
+    m.rotation = hashUnit(n.id, 7) * (CONFIG.NOTE_TILT * Math.PI / 180);   // a slight tilt
+    n.__dot.scale.setScalar(CONFIG.NOTE_SIZE * LOOK / (LOOK - LOOK_PAD * 2));
     return;
   }
   const grad = CONFIG.COLOR_BY === "meaning" && !CONFIG.DOT_COLOR && CONFIG.DOT_STYLE !== "ink" && n.blend > 0;
@@ -172,8 +247,10 @@ function makeBall(node) {
     node.__img.onload = () => {
       paint(node);
       if (!node.paper) {                                   // new photos: measure the paper
-        try { node.paper = paperColor(node.__img); paintDot(node); } catch (e) {}
+        try { node.paper = paperColor(node.__img); } catch (e) {}
       }
+      node.__lookKey = null;
+      paintDot(node);
     };
     node.__img.src = node.image;
   }
