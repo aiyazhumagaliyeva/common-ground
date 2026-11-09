@@ -10,6 +10,8 @@
 //  colors looks halfway to the eye (no muddy browns).
 // ============================================================
 import { CONFIG } from './config.js';
+import { LABELS } from './labels.js';
+import { knownVector } from './cluster.js';
 
 const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
 function meanUnit(vs) {
@@ -53,6 +55,23 @@ function shortName(text) {
   return t;
 }
 
+// ---- 1–2 word names: the AI picks the closest name from labels.js ----
+// Best matches are handed out first, and no two groups get the same name.
+// If no name fits well enough, the group keeps its most typical note as its name.
+let labelVecs = null;
+function nameGroups(groups) {
+  if (!labelVecs) labelVecs = LABELS.map(l => [l, knownVector(l)]).filter(x => x[1]);
+  const pairs = [];
+  groups.forEach((g, gi) => labelVecs.forEach(([l, v], li) => pairs.push([dot(g.center, v), gi, li])));
+  pairs.sort((a, b) => b[0] - a[0]);
+  const named = new Set(), used = new Set();
+  for (const [score, gi, li] of pairs) {
+    if (named.has(gi) || used.has(li) || score < CONFIG.NAME_MIN_MATCH) continue;
+    groups[gi].name = labelVecs[li][0];
+    named.add(gi); used.add(li);
+  }
+}
+
 // ---- main: give every note a color, return the key ----
 // note.colorA / note.colorB / note.blend (0 = solid colorA, up to 0.5 = even gradient)
 export function colorByMeaning(notes) {
@@ -72,6 +91,8 @@ export function colorByMeaning(notes) {
     const typical = members.reduce((best, n) => (dot(n.vec, center) > dot(best.vec, center) ? n : best));
     return { id: g, center, color: palette[i % palette.length], name: shortName(typical.text), count: members.length };
   });
+
+  nameGroups(groups);
 
   const T = CONFIG.COLOR_SOFTNESS;                         // smaller = sharper color borders
   notes.forEach(n => {

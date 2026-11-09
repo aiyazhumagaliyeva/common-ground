@@ -28,7 +28,7 @@ export const CONFIG = {
   // ---- CLUSTERING (how groups emerge) ----
   // How similar two notes must be to belong together (0 = anything, 1 = identical).
   // Higher = more, smaller groups. Lower = fewer, bigger groups.
-  JOIN_SIMILARITY: 0.40,
+  JOIN_SIMILARITY: 0.30,
 
   // A group only "emerges" once it has this many notes.
   // Smaller sets stay in the general middle cloud.
@@ -45,6 +45,10 @@ export const CONFIG = {
   ZOOM_SPEED: 1.4,        // how fast scrolling zooms (1 = normal)
   DOT_STYLE: "group",     // "group" = color per group (like TensorFlow), "ink" = all dark dots
   BG_COLOR: "#ffffff",    // map background (also change body background-color in index.html to match)
+  // ---- GROUP NAMES ----
+  // Each group is named with the closest 1–2 word name from js/labels.js.
+  NAME_MIN_MATCH: 0.2,    // how well a name must fit (0–1); below this the group shows its most typical note
+
   // ---- COLORS ----
   COLOR_BY: "meaning",    // "meaning" = each group gets a color, notes in between get gradients; "random" = random per note
   // sticky-note colors, given to groups in order (biggest group first). The first 4 are the main ones;

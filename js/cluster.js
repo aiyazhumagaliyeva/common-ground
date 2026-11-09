@@ -12,6 +12,7 @@
 
 import { CONFIG } from './config.js';
 import { SEED_VECTORS } from './seed-vectors.js';
+import { LABEL_VECTORS } from './label-vectors.js';
 
 // The AI library loads only when needed, so the map still shows if it fails.
 let extractor = null;
@@ -55,6 +56,7 @@ function remember(text, v) {
 }
 export function knownVector(text) {
   if (SEED_VECTORS[text]) return decode(SEED_VECTORS[text]);
+  if (LABEL_VECTORS[text]) return decode(LABEL_VECTORS[text]);
   try { const s = localStorage.getItem("cg:vec:" + text); if (s) return decode(s); } catch (e) {}
   return null;
 }
