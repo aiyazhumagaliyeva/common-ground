@@ -72,10 +72,11 @@ export const CONFIG = {
   DOT_COLOR: "",          // one color for every dot instead (e.g. "#f3dd96"); "" = use DOT_COLORS
   DOT_SIZE: 7,            // size of a dot on the map
   // ---- WAYS TO EXPLORE (each can be switched off) ----
-  HOVER_NEIGHBORS: 5,     // 1. point at a note: it and its 5 closest notes stay, the rest fade (0 = off)
+  HOVER_NEIGHBORS: 5,     // 1. point at a note: it and its 5 closest notes stay, the rest get lighter (0 = off)
+  HOVER_WHITEN: 0.35,     // 1. how much lighter the other notes get (0 = not at all, 1 = fully white)
   READING_PANEL: true,    // 2. click a note: its words + arrows through similar wishes (false = off)
   SIMILAR_COUNT: 5,       // 2. how many similar wishes the panel steps through
-  DEPTH_FADE: 0.6,        // 4. notes far away fade into the background (0 = off, 1 = strong)
+  DEPTH_FADE: 0.45,       // 4. notes far away get lighter (0 = off, 1 = strong)
   FLOAT_EACH: 0.18,       // 5. each note floats on its own, like paper in still air (0 = off)
   INTRO_STYLE: "gather",  // 6. "gather" = notes fly in from everywhere and find their places; "pop" = old intro
   DRIFT_SPEED: 0.35,      // slow turning of the map until someone touches it (0 = off)

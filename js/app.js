@@ -218,7 +218,18 @@ function paintDot(n) {
     m.rotation = hashUnit(n.id, 7) * (CONFIG.NOTE_TILT * Math.PI / 180);   // a slight tilt
     n.__baseScale = CONFIG.NOTE_SIZE * LOOK / (LOOK - LOOK_PAD * 2);
     n.__dot.scale.setScalar(n.__baseScale);
-    m.depthWrite = false;                                 // faded notes don't hide the ones behind
+    m.depthWrite = false;
+    if (!m.__whiten) {                                    // lets a note be lightened toward white (stays solid)
+      m.__whiten = { value: 0 };
+      m.onBeforeCompile = sh => {
+        sh.uniforms.uWhiten = m.__whiten;
+        sh.fragmentShader = "uniform float uWhiten;\n" + sh.fragmentShader.replace(
+          "#include <colorspace_fragment>",
+          "#include <colorspace_fragment>\n  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(1.0), uWhiten);");
+      };
+      m.customProgramCacheKey = () => "whiten";
+      m.needsUpdate = true;
+    }
     return;
   }
   const grad = CONFIG.COLOR_BY === "meaning" && !CONFIG.DOT_COLOR && CONFIG.DOT_STYLE !== "ink" && n.blend > 0;
@@ -381,18 +392,22 @@ function tick(now) {
     }
     if (!n.__arriving && d.visible && !(n.__crumple.mesh.visible)) {
       // 1. hover: the note and its closest notes stay bright, the rest fade back
-      let op = 1, grow = 1;
+      // (notes get lighter toward white, they don't turn see-through)
+      let white = 0, grow = 1;
       if (focus) {
         if (n === focus) grow = 1.15;
         else if (focusSet.has(n)) grow = 1.07;
-        else op = 0.15;
+        else white = CONFIG.HOVER_WHITEN;
       }
-      // 4. depth: notes far behind the middle fade toward the background
+      // 4. depth: notes far behind the middle get lighter
       if (CONFIG.DEPTH_FADE) {
         const far = cam.position.distanceTo(g.position) / (cam.position.distanceTo(controls.target) || 1);
-        op *= 1 - CONFIG.DEPTH_FADE * Math.min(1, Math.max(0, (far - 0.85) / 0.9));
+        const depth = CONFIG.DEPTH_FADE * Math.min(1, Math.max(0, (far - 0.85) / 0.9));
+        white = 1 - (1 - white) * (1 - depth);
       }
-      d.material.opacity += (op - d.material.opacity) * 0.12;
+      const wh = d.material.__whiten;
+      if (wh) wh.value += (white - wh.value) * 0.12;
+      d.material.opacity += (1 - d.material.opacity) * 0.12;      // fades in during the intro
       if (n.__baseScale) d.scale.setScalar(d.scale.x + (n.__baseScale * grow - d.scale.x) * 0.15);
     }
     const m = n.__crumple.mesh;
