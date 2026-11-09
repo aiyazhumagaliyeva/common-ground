@@ -200,23 +200,6 @@
 
     /* ---------- NOTES-ONLY VIEW: delete these 2 lines to bring the sidebar back ---------- */
     #sidebar { display: none !important; }
-    /* ---------- READING PANEL (bottom center) ---------- */
-    #reader {
-      position: fixed; z-index: 4; left: 50%; transform: translateX(-50%);
-      bottom: max(16px, calc(40 * var(--k))); width: min(520px, calc(100vw - 24px));
-      padding: 18px 22px 14px; border: 1px solid #000; border-radius: 24px; background: rgba(255,255,255,0.1);
-      font-family: Helvetica, Arial, sans-serif; color: #000; animation: readerIn 0.35s ease-out;
-    }
-    #reader[hidden] { display: none; }
-    body.page-open #reader { display: none; }
-    @keyframes readerIn { from { opacity: 0; transform: translate(-50%, 8px); } }
-    #readerText { margin: 0 28px 12px 0; font-size: max(15px, calc(18 * var(--k))); line-height: 1.35; }
-    #reader .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: rgba(0,0,0,0.55); }
-    #reader button { all: unset; cursor: pointer; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #000; border-radius: 50%; font-size: 16px; color: #000; }
-    #reader button:disabled { opacity: 0.25; cursor: default; }
-    #reader button:focus-visible { outline: 2px solid #000; outline-offset: 2px; }
-    #reader #readerClose { position: absolute; top: 10px; right: 10px; border: 0 !important; width: 28px !important; height: 28px !important; font-size: 20px !important; }
-
     /* ---------- COLOR KEY (bottom left) ---------- */
     #colorKey {
       position: fixed; z-index: 3; left: max(16px, calc(32 * var(--k))); bottom: max(16px, calc(32 * var(--k)));
@@ -396,15 +379,6 @@
   <div id="map"></div>
   <div id="mapInfo"></div>
   <aside id="colorKey" aria-label="Color key" hidden></aside>
-  <section id="reader" aria-label="Reading a note" hidden>
-    <button type="button" id="readerClose" aria-label="Close">×</button>
-    <p id="readerText"></p>
-    <div class="row">
-      <button type="button" id="readerPrev" aria-label="Previous similar wish">←</button>
-      <span id="readerInfo"></span>
-      <button type="button" id="readerNext" aria-label="Next similar wish">→</button>
-    </div>
-  </section>
 
   <!-- ---------- NAV PILL ---------- -->
   <nav id="nav">
