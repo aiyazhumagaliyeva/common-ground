@@ -259,7 +259,7 @@ function openNote(node) {
   node.__openedAt = performance.now();
   flyTo(node, 1100);
   clearTimeout(openViewTimer);
-  openViewTimer = setTimeout(() => { if (selected === node) showNoteView(node); }, 750);
+  openViewTimer = setTimeout(() => { if (selected === node) showNoteView(node); }, 300);
 }
 function closeNote() {
   const n = selected;
@@ -268,10 +268,19 @@ function closeNote() {
   track("note_close", { id: n.id, seconds: Math.round((performance.now() - n.__openedAt) / 1000) });
   clearTimeout(openViewTimer);
   hideNoteView();
-  controls.autoRotate = CONFIG.DRIFT_SPEED > 0;
+  setTimeout(() => { if (!selected) controls.autoRotate = CONFIG.DRIFT_SPEED > 0; }, 500);   // after the note is back on the map
 }
 graph.onNodeClick(openNote);
 graph.onBackgroundClick(closeNote);
+
+// research: which notes people stop on (hovered at least 1 second). Clarity can't see inside the 3D map,
+// so this goes to the events tab (and to Clarity as an event, to filter recordings by it)
+let hoverNote = null, hoverSince = 0;
+graph.onNodeHover(n => {
+  const now = performance.now();
+  if (hoverNote && now - hoverSince >= 1000) track("note_hover", { id: hoverNote.id, seconds: Math.round((now - hoverSince) / 100) / 10 });
+  hoverNote = n || null; hoverSince = now;
+});
 
 // ---- opening animation: notes pop in ----
 function intro() {
@@ -361,6 +370,15 @@ $("navAdd").addEventListener("click", () => {
   startHandoff();
 });
 $("navAbout").addEventListener("click", () => { openPage("aboutPage"); track("about_open"); });
+// phone menu (Figma: phone-menu): the same three buttons as the desktop pill
+function setMenu(open) {
+  $("phoneMenu").hidden = !open;
+  $("menuBtn").setAttribute("aria-expanded", open);
+  if (open) track("menu_open");
+}
+$("menuBtn").addEventListener("click", () => setMenu(true));
+$("menuClose").addEventListener("click", () => setMenu(false));
+document.querySelectorAll("#phoneMenu [data-go]").forEach(b => b.addEventListener("click", () => { setMenu(false); $(b.dataset.go).click(); }));
 $("optOut").addEventListener("click", () => { optOut(); $("optOut").outerHTML = "<span>Done, your visits aren’t counted.</span>"; });
 if (optedOut()) $("optOut").outerHTML = "<span>Your visits aren’t counted.</span>";
 $("navContact").addEventListener("click", () => { openPage("contactPage"); track("contact_open"); });
@@ -434,14 +452,27 @@ function pillMessage(t) {
   setTimeout(() => { $("handoffPill").hidden = true; $("handoffPill").querySelector(".pulse").hidden = false; }, 6000);
 }
 
-// came from the phone page ("See where it landed")? show that person's note
+// just sent from this phone (no laptop)? the camera page sends you here:
+//   ?mine=1     → your note flies onto the map
+//   ?replied=1  → the note you answered opens and your response lands on it
 async function showMyNote() {
-  if (!new URLSearchParams(location.search).has("mine")) return;
+  const q = new URLSearchParams(location.search);
+  if (!q.has("mine") && !q.has("replied")) return;
+  history.replaceState(null, "", location.pathname);      // a refresh shouldn't play it again
+  const key = q.has("mine") ? "cg:myNote" : "cg:myReply";
   let data = null;
-  try { data = JSON.parse(localStorage.getItem("cg:myNote")); } catch (e) {}
-  if (!data) return;
+  try { data = JSON.parse(localStorage.getItem(key)); } catch (e) {}
+  if (!data || Date.now() - (data.t || 0) > 10 * 60 * 1000) return;   // only right after sending
   await wait(2800);                            // let the intro finish first
-  arrive(data);
+  if (q.has("mine")) { arrive(data); return; }
+  const n = notes.find(x => x.id === data.replyTo);
+  if (!n) return;
+  openNote(n);
+  await wait(1300);
+  if (viewNote !== n) return;
+  (responsesFor[n.id] = responsesFor[n.id] || []).push({ text: data.text, image: data.image, pending: true });
+  addResponseBadges(n);
+  drawResponses(n, true);
 }
 
 // ============================================================
@@ -453,7 +484,8 @@ async function arrive(data) {
   if (selected) closeNote();
   controls.autoRotate = false;
   const node = {
-    id: "n" + Date.now(), text: data.text, image: data.image || null,
+    id: data.id ? "s" + data.id : "n" + Date.now(),   // same id as after approval, so responses find it
+    text: data.text, image: data.image || null,
     allowReplies: data.allowReplies, pending: true, group: -1, __arriving: true
   };
   node.vec = knownVector(node.text);
@@ -518,7 +550,7 @@ const TOUR = [
   { id: "open", text: touch ? "Tap a note to open it" : "Click to open a note",
     cursor: "click", from: [688, 544], start: [930, 700], textAt: [894, 837], opensNote: true },
   { id: "respond", text: touch ? "Tap here to respond to a note" : "Click here to respond to a note",
-    cursor: "click", from: [760, 922], start: [980, 760], textAt: [894, 837], respond: true },
+    cursor: "click", from: [756, 806], start: [980, 700], textAt: [894, 850], respond: true },
   { id: "add", text: touch ? "Tap here to add a note" : "Click to add a note",
     cursor: "click", from: [756, 89], start: [980, 330], textAt: [894, 837], loop: true },
 ];
@@ -672,31 +704,77 @@ if (!toured && !new URLSearchParams(location.search).has("mine")) {
 
 // ============================================================
 //  NOTE VIEW (Figma: home-responce-new, home-response-flow-1/2/3)
-//  Click a note: it opens big over a grey veil, its responses around it.
-//  "Click here to get a response QR code" opens the instructions + QR.
-//  A response sent from a phone lands on the note's bottom-right corner.
+//  Click a note: the camera zooms toward it while the note itself grows
+//  from its spot on the map into the middle, over a grey veil.
+//  "Respond with a photo" moves it left and shows a QR card (flow 2).
+//  A response sent from a phone lands on top of the note (flow 3).
 // ============================================================
 // where responses sit around the note (Figma placeholder positions, 1512 × 982 frame)
-const RESPONSE_SLOTS = [[881, 615], [995, 743], [356, 251], [245, 383], [97, 307], [198, 585], [881, 403], [1041, 527], [399, 615]];
+const RESPONSE_SLOTS = [[906, 615], [1020, 743], [381, 251], [270, 383], [122, 307], [223, 585], [906, 403], [1066, 527], [424, 615]];
 let viewNote = null, respondTimer = null, closeRespondLive = null;
 
+// where a note is on the screen right now (centre, size in px, tilt), from its 3D position
+function noteOnScreen(n) {
+  const cam = graph.camera(), v = new THREE.Vector3();
+  n.__note.getWorldPosition(v);
+  const d = v.distanceTo(cam.position) || 1;
+  const p = v.clone().project(cam);
+  const size = (CONFIG.NOTE_SIZE * n.__group.scale.x) / (2 * d * Math.tan(cam.fov * Math.PI / 360)) * innerHeight;
+  return { x: (p.x + 1) / 2 * innerWidth, y: (1 - p.y) / 2 * innerHeight, size, rot: -n.__note.material.rotation };
+}
+// the CSS transform that puts the big note image exactly over the small note on the map
+function onMapTransform(n) {
+  const r = $("nvImg").getBoundingClientRect(), s = noteOnScreen(n);
+  return `translate(${s.x - (r.left + r.width / 2)}px, ${s.y - (r.top + r.height / 2)}px) scale(${Math.max(0.02, s.size / r.width)}) rotate(${s.rot}rad)`;
+}
+const VEIL = "rgba(38, 38, 38, 0.4)", NO_VEIL = "rgba(38, 38, 38, 0)";
+let closingNote = null;
+function stopViewAnimations() {
+  [$("noteView"), $("nvImg"), $("nvLabel"), $("nvRespond"), $("nvResponses")].forEach(el => el.getAnimations().forEach(a => a.cancel()));
+  if (closingNote) { closingNote.__note.visible = true; closingNote = null; }
+}
+
 function showNoteView(n) {
+  stopViewAnimations();
   viewNote = n;
-  const v = $("noteView");
-  $("nvImg").src = n.image || "";
-  $("nvImg").alt = n.text;
-  $("nvBar").hidden = !n.allowReplies;
-  $("nvRespond").textContent = isPhone ? "Tap here to respond" : "Click here to get a response QR code";
+  const v = $("noteView"), img = $("nvImg");
+  img.src = n.image || "";
+  img.alt = n.text;
+  $("nvLabel").hidden = $("nvRespond").hidden = !n.allowReplies;
   $("nvCard").hidden = true;
   v.classList.remove("responding");
   drawResponses(n);
   v.hidden = false;
   if (!$("tour").hidden) $("tour").classList.add("clear");   // walkthrough: the note view greys the map now
+  // the note grows out of its spot on the map into the middle; the veil darkens behind it
+  const from = onMapTransform(n);
+  n.__note.visible = false;                                   // the big image takes its place
+  img.animate([{ transform: from, boxShadow: "none" }, { transform: "none" }], { duration: 700, easing: "cubic-bezier(.2,.75,.2,1)" });
+  v.animate([{ backgroundColor: NO_VEIL }, { backgroundColor: VEIL }], { duration: 600, easing: "ease-out" });
+  [$("nvLabel"), $("nvRespond"), $("nvResponses")].forEach(el =>
+    el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, delay: 500, fill: "backwards" }));
 }
 function hideNoteView() {
   stopRespond();
-  $("noteView").hidden = true;
+  const n = viewNote, v = $("noteView"), img = $("nvImg");
   viewNote = null;
+  if (!n || v.hidden) { v.hidden = true; if (n) n.__note.visible = true; return; }
+  stopViewAnimations();
+  $("nvCard").hidden = true;
+  img.style.transition = "none";                               // jump back from the "responding" spot without sliding
+  v.classList.remove("responding");
+  // the note shrinks back into its spot on the map; the veil lightens
+  closingNote = n;
+  [$("nvLabel"), $("nvRespond"), $("nvResponses")].forEach(el => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: "forwards" }));
+  v.animate([{ backgroundColor: VEIL }, { backgroundColor: NO_VEIL }], { duration: 450, fill: "forwards" });
+  const a = img.animate([{ transform: "none" }, { transform: onMapTransform(n), boxShadow: "none" }],
+    { duration: 450, easing: "cubic-bezier(.4,0,.2,1)", fill: "forwards" });
+  a.onfinish = () => {
+    if (closingNote !== n) return;                           // another note opened meanwhile
+    v.hidden = true;
+    stopViewAnimations();
+    img.style.transition = "";
+  };
 }
 const PHONE_SLOTS = [[50, 52], [-8, 56], [56, -10], [-10, -8], [22, 62], [60, 22], [-12, 24], [24, -14], [36, 40]];
 const phoneView = () => matchMedia("(max-width: 700px)").matches;
@@ -728,6 +806,7 @@ async function startRespond() {
     location.href = "phone.html?reply=" + encodeURIComponent(n.id) + (SOURCE !== "direct" ? "&src=" + encodeURIComponent(SOURCE) : "");
     return;
   }
+  $("nvImg").style.transition = "";
   $("noteView").classList.add("responding");
   $("nvCard").hidden = false;
   track("respond_open", { id: n.id });

@@ -8,7 +8,7 @@
 //   5. saves anonymous visit events to the "events" tab (research)
 // ============================================================
 
-const VERSION = 6;   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
+const VERSION = 7;   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
 
 const SHEET_NAME = "notes";
 const HEADERS = ["id", "createdAt", "status", "flag", "text", "allowReplies", "color", "image", "session", "source", "replyTo"];
@@ -80,7 +80,7 @@ function doGet(e) {
     const r = rows.reverse().find(row => s && row[8] === s);
     if (!r) return json({ status: s && CacheService.getScriptCache().get("c_" + s) ? "connected" : "waiting" });
     return json({
-      status: "received", flag: r[3], text: r[3] === "ok" ? r[4] : "",
+      status: "received", id: r[0], flag: r[3], text: r[3] === "ok" ? r[4] : "",
       image: r[3] === "ok" ? r[7] : "", allowReplies: r[5] === true, replyTo: r[10] || ""
     });
   }
@@ -134,12 +134,13 @@ function saveNote(body) {
   const status = flag === "ok" ? "pending" : "flagged";
   const session = String(body.session || "").replace(/[^a-z0-9]/gi, "").slice(0, 20);
   const source = String(body.source || "").replace(/[^a-z0-9\-_]/gi, "").slice(0, 60);
+  const id = Utilities.getUuid();
   getSheet().appendRow([
-    Utilities.getUuid(), new Date(), status, flag, text,
+    id, new Date(), status, flag, text,
     replyTo ? false : body.allowReplies === true, String(body.color || ""), image, session, source, replyTo
   ]);
   if (flag === "self-harm") notifyMe(text);
-  return { ok: true, status, flag };
+  return { ok: true, status, flag, id };     // id: so the screen can give the note its real id
 }
 
 // ---------- anonymous visit events (from js/track.js) ----------

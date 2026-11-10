@@ -25,49 +25,50 @@
       left: 0;
     }
 
-    /* ---------- NOTE VIEW (Figma home-responce-new): veil #262626 40%, note 432 × 429, responses 176 × 175 ---------- */
-    #noteView { position: fixed; inset: 0; z-index: 4; background: rgba(38, 38, 38, 0.4); animation: tourIn 0.3s ease-out; }
+    /* ---------- NOTE VIEW (Figma home-response-flow-1/2/3): veil #262626 40%, note 432 × 429, responses 176 × 175 ---------- */
+    #noteView { position: fixed; inset: 0; z-index: 4; background: rgba(38, 38, 38, 0.4); }
     #noteView[hidden] { display: none; }
     #nvStage { position: absolute; left: 50%; top: 50%; width: calc(1512 * var(--k)); height: calc(982 * var(--k)); transform: translate(-50%, -50%); }
-    #nvImg { position: absolute; left: calc(515 * var(--k)); top: calc(295 * var(--k)); width: calc(432 * var(--k)); height: calc(429 * var(--k));
+    /* flow 1: the note in the middle, "Open to responses" above it, the button below */
+    #nvImg { position: absolute; z-index: 1; left: calc(540 * var(--k)); top: calc(295 * var(--k)); width: calc(432 * var(--k)); height: calc(429 * var(--k));
       object-fit: cover; box-shadow: 0 calc(10 * var(--k)) calc(30 * var(--k)) rgba(0,0,0,0.25); transition: left 0.5s ease; cursor: default; }
-    #noteView.responding #nvImg { left: calc(126 * var(--k)); }
-    #noteView.responding #nvResponses { opacity: 0; pointer-events: none; }
-    #nvResponses { transition: opacity 0.3s ease; }
-    #nvImg { z-index: 1; }
-    .nvResp { z-index: 2; }   /* responses sit on top of the note */
-    .nvResp { position: absolute; width: calc(176 * var(--k)); height: calc(175 * var(--k)); background: #fff; object-fit: cover;
+    #nvLabel { position: absolute; left: calc(540 * var(--k)); top: calc(256 * var(--k)); margin: 0; color: #fff; white-space: nowrap;
+      font-family: Helvetica, Arial, sans-serif; font-size: max(15px, calc(20 * var(--k))); transition: left 0.5s ease; }
+    #nvLabel[hidden] { display: none; }
+    #nvRespond { all: unset; box-sizing: border-box; cursor: pointer; position: absolute; left: calc(756 * var(--k)); top: calc(779 * var(--k)); transform: translateX(-50%);
+      display: flex; align-items: center; gap: calc(10 * var(--k)); padding: calc(17 * var(--k)) calc(24 * var(--k)); border-radius: 100px;
+      background: #fffae3; color: #1f1f1a; font-family: Inter, Helvetica, Arial, sans-serif; font-weight: 500; font-size: max(14px, calc(17 * var(--k)));
+      white-space: nowrap; user-select: none; -webkit-user-select: none; transition: opacity 0.3s ease, background-color 0.2s; }
+    #nvRespond[hidden] { display: none; }
+    #nvRespond img { width: max(16px, calc(20 * var(--k))); height: auto; display: block; }
+    #nvRespond:hover { background: #fff3c4; }
+    #nvRespond:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+    #noteView.responding #nvRespond { opacity: 0; pointer-events: none; }
+    /* responses sit on top of the note */
+    .nvResp { position: absolute; z-index: 2; width: calc(176 * var(--k)); height: calc(175 * var(--k)); background: #fff; object-fit: cover;
       box-shadow: 0 calc(6 * var(--k)) calc(18 * var(--k)) rgba(0,0,0,0.2); }
     .nvResp.landing { animation: respLand 0.7s cubic-bezier(.2,.9,.3,1.2); }
     @keyframes respLand { from { transform: translate(calc(60 * var(--k)), calc(120 * var(--k))) scale(1.4); opacity: 0; } }
-    #nvBar { user-select: none; -webkit-user-select: none; position: absolute; left: calc(515 * var(--k)); top: calc(919 * var(--k)); display: flex; gap: calc(18 * var(--k));
-      color: #fff; font-family: Helvetica, Arial, sans-serif; font-size: max(15px, calc(20 * var(--k))); white-space: nowrap; }
-    #nvBar[hidden] { display: none; }
-    #nvRespond { all: unset; cursor: pointer; }
-    #nvRespond:hover { text-decoration: underline; }
-    #nvRespond:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-    /* flow 2: white card 769 × 433, radius 20, padding 39 22 25 23 */
-    #nvCard { position: absolute; left: calc(600 * var(--k)); top: calc(295 * var(--k)); width: calc(769 * var(--k)); height: calc(433 * var(--k));
-      box-sizing: border-box; padding: calc(39 * var(--k)) calc(22 * var(--k)) calc(25 * var(--k)) calc(23 * var(--k));
-      background: #fff; border-radius: calc(20 * var(--k)); color: #000; font-family: Helvetica, Arial, sans-serif;
-      font-size: max(13px, calc(20 * var(--k))); line-height: normal; animation: tourIn 0.35s ease-out; }
+    #nvResponses { transition: opacity 0.3s ease; }
+    #noteView.responding #nvResponses { opacity: 0; pointer-events: none; }
+    /* flow 2: the note moves left, a cream card with the QR on the right (300 wide, padding 40 / 20, gap 40) */
+    #noteView.responding #nvImg, #noteView.responding #nvLabel { left: calc(421 * var(--k)); }
+    #nvCard { position: absolute; left: calc(894 * var(--k)); top: calc(295 * var(--k)); width: calc(300 * var(--k)); box-sizing: border-box;
+      display: flex; flex-direction: column; gap: calc(40 * var(--k)); padding: calc(40 * var(--k)) calc(20 * var(--k));
+      background: #fffae3; color: #000; font-family: Helvetica, Arial, sans-serif; font-size: max(14px, calc(20 * var(--k))); line-height: normal;
+      animation: tourIn 0.35s ease-out; }
     #nvCard[hidden] { display: none; }
-    #nvCard .lead { white-space: nowrap; margin: 0 0 calc(27 * var(--k)); }
-    #nvCard .cols { display: flex; gap: calc(32 * var(--k)); }
-    #nvCard ol { list-style: none; margin: 0; padding: 0; width: calc(346 * var(--k)); display: flex; flex-direction: column; gap: calc(18 * var(--k)); }
-    #nvCard li { display: flex; gap: calc(20 * var(--k)); align-items: flex-start; text-wrap: pretty; }
-    #nvCard .n { flex-shrink: 0; width: calc(34 * var(--k)); height: calc(34 * var(--k)); border: 1px solid #000; border-radius: 50%;
-      display: grid; place-items: center; box-sizing: border-box; }
-    #nvCard .qrSlot { padding-left: calc(9 * var(--k)); }
-    #nvQr { width: calc(131 * var(--k)); height: calc(131 * var(--k)); }
+    #nvCard p { margin: 0; text-wrap: pretty; }
+    #nvQr { width: 100%; aspect-ratio: 1; }
     #tour.clear { background: transparent; transition: background-color 0.3s ease 0.15s; }   /* fades as the note view fades in: no flash */
-    /* phones: the note fills the width, responses overlap its edges, text at the bottom */
+    /* phones (Figma phone-open note): note 278 wide in the middle, label above, button below */
     @media (max-width: 700px) {
       #nvStage { left: 0; top: 0; width: 100%; height: 100%; transform: none; --nvTop: calc(46dvh - 36vw); }
       #nvImg, #noteView.responding #nvImg { left: 14vw; top: var(--nvTop); width: 72vw; height: 72vw; }
+      #nvLabel, #noteView.responding #nvLabel { left: 14vw; top: calc(var(--nvTop) - 28px); font-size: 16px; }
+      #nvRespond { left: 14vw; width: 72vw; top: calc(var(--nvTop) + 72vw + 33px); transform: none; justify-content: center;
+        padding: 12px 24px; font-size: 16px; }
       .nvResp { width: 26vw; height: 26vw; }
-      #nvBar { left: 16px; right: 16px; top: auto; bottom: 100px; justify-content: center; flex-wrap: wrap; gap: 6px 14px; font-size: 16px; white-space: normal; }
-      #nvRespond { text-decoration: underline; }
     }
     #tourCopy.phone { position: fixed; left: 24px; right: 24px; bottom: 170px; width: auto; z-index: 1; }
     #tourCopy.phone #tourText { font-size: 18px; }
@@ -145,7 +146,7 @@
       left: max(16px, calc(42 * var(--k))); top: max(16px, calc(33 * var(--k)));
     }
     .page .back img { width: max(32px, calc(40 * var(--k))); height: auto; display: block; }
-    .page .back:hover { opacity: 0.6; }
+    @media (hover: hover) { .page .back:hover { opacity: 0.6; } }   /* only with a mouse: on phones a tap would leave it faded */
     .page h1 {
       font-weight: 400; text-align: center; line-height: normal;
       font-size: max(22px, calc(32 * var(--k)));
@@ -220,29 +221,56 @@
       :root { --k: calc(100vw / 800); }
       .steps { grid-template-columns: 1fr 1fr; }
     }
-    @media (max-width: 600px) {
-      /* bigger menu with real finger-sized buttons */
-      #nav {
-        top: 14px; width: calc(100vw - 24px); justify-content: space-between;
-        gap: 10px; padding: 6px 18px; font-size: 16px;
-      }
-      #nav .brand { font-size: 17px; }
-      #nav button { min-height: 44px; }
-      #nav .links { gap: 14px; }
-      #nav .camera { width: 20px; }
-    }
-    @media (max-width: 420px) {
-      /* too narrow for one row: name on top, links below */
-      #nav { flex-wrap: wrap; justify-content: space-around; row-gap: 0; border-radius: 26px; padding: 8px 14px 4px; }
-      #nav .brand { flex-basis: 100%; text-align: center; font-size: 18px; }
-      #nav .divider { display: none; }
-      #nav .links { gap: 22px; }
-    }
     @media (max-width: 520px) {
       .steps { grid-template-columns: 1fr; }
       .page h1 { margin-top: 72px; padding: 0 16px; font-size: 22px; }
     }
     .privacy { font-size: 0.85em; color: rgba(0,0,0,0.5); }
+
+    /* ---------- PHONE (Figma: phone-home, phone-menu, phone-about, phone-contact) ---------- */
+    #phoneBar, #phoneMenu, .mob { display: none; }
+    @media (max-width: 600px) {
+      .desk { display: none !important; }
+      .mob { display: revert; }
+      #nav { display: none; }
+      .brand-phone, #phoneBar .brand, #phoneMenu .brand { font-family: Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 20px; color: #000; white-space: nowrap; }
+      /* header: name left, menu icon right */
+      #phoneBar { display: flex; position: fixed; z-index: 5; left: 26px; right: 33px; top: calc(14px + env(safe-area-inset-top, 0px));
+        align-items: center; justify-content: space-between; transition: opacity 0.3s ease; }
+      body.page-open #phoneBar { opacity: 0; pointer-events: none; }
+      #phoneBar button, #phoneMenu button { all: unset; cursor: pointer; }
+      #menuBtn { padding: 12px; margin: -12px; }
+      #menuBtn img { width: 23px; height: 18px; display: block; }
+      /* menu: white screen, big links */
+      #phoneMenu:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 9; background: #fff; animation: tourIn 0.25s ease-out; }
+      #phoneMenu .top { position: absolute; left: 28px; right: 33px; top: calc(19px + env(safe-area-inset-top, 0px)); display: flex; align-items: center; justify-content: space-between; }
+      #menuClose { padding: 12px; margin: -12px; }
+      #menuClose img { width: 16px; height: 16px; display: block; }
+      #phoneMenu .items { position: absolute; left: 28px; top: calc(122px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 40px; }
+      #phoneMenu .items button { font-family: Helvetica, Arial, sans-serif; font-size: 32px; color: #000; }
+      /* pages: back arrow + name at the top */
+      .page .back { position: fixed; left: 0; right: 0; top: 0; z-index: 2; display: flex; align-items: center; gap: 16px;
+        padding: calc(19px + env(safe-area-inset-top, 0px)) 17px 12px; background: #fff; }
+      .page .back img { display: none; }
+      .page .back::before { content: ""; width: 19px; height: 16px; background: url(icons/arrow-left.svg) no-repeat center / contain; }
+      .page .back::after { content: "Common Ground"; font-family: Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 20px; color: #000; }
+      .page h1 { margin-top: calc(76px + env(safe-area-inset-top, 0px)); padding: 0 16px; font-size: 20px; }
+      .about { width: auto; margin: 30px 17px 0; gap: 28px; padding-bottom: 80px; }
+      .about p, .about li { font-size: 16px; }
+      .about h2 { font-size: 18px; }
+      .contact { width: auto; margin: 20px 17px; font-size: 16px; }
+      /* add a note: one column of steps, "Submit a note" button at the bottom */
+      .steps { width: 325px; max-width: calc(100vw - 48px); margin: 40px auto 0; grid-template-columns: 1fr; row-gap: 40px; padding-bottom: 140px; }
+      .step .num { width: 34px; font-size: 20px; }
+      .step img { height: 150px; }
+      .step img.mob { height: 96px; display: block; }
+      .step p { font-size: 16px; margin-top: 20px; max-width: none; }
+      .qrCard .caption, #addStatus:empty { display: none; }
+      .cameraBtn, .cameraBtn[hidden] { position: fixed; left: 50%; right: auto; transform: translateX(-50%); bottom: calc(57px + env(safe-area-inset-bottom, 0px));
+        z-index: 6; padding: 16px 50px; border-radius: 60px; background: #ffda69; color: #000; box-shadow: none;
+        font-family: Helvetica, Arial, sans-serif; font-size: 16px; white-space: nowrap; }
+      .cameraBtn[hidden] { display: none; }
+    }
   .linkBtn { all: unset; cursor: pointer; text-decoration: underline; }
 </style>
 </head>
@@ -250,28 +278,35 @@
   <div id="map"></div>
   <div id="mapInfo"></div>
 
+  <!-- ---------- PHONE HEADER + MENU (Figma: phone-home, phone-menu) ---------- -->
+  <header id="phoneBar">
+    <span class="brand">Common Ground</span>
+    <button id="menuBtn" aria-label="Open the menu" aria-expanded="false"><img src="icons/menu.svg" alt=""></button>
+  </header>
+  <div id="phoneMenu" hidden>
+    <div class="top">
+      <span class="brand">Common Ground</span>
+      <button id="menuClose" aria-label="Close the menu"><img src="icons/close.svg" alt=""></button>
+    </div>
+    <nav class="items" aria-label="Menu">
+      <button data-go="navAdd">Add a note</button>
+      <button data-go="navAbout">About</button>
+      <button data-go="navContact">Contact Us</button>
+    </nav>
+  </div>
+
   <!-- ---------- NAV PILL ---------- -->
   <!-- ---------- NOTE VIEW (Figma: home-responce-new, home-response-flow-1/2/3) ---------- -->
   <div id="noteView" hidden>
     <div id="nvStage">
       <div id="nvResponses"></div>
+      <p id="nvLabel" hidden>Open to responses</p>
       <img id="nvImg" alt="">
+      <button type="button" id="nvRespond" hidden>Respond with a photo <img src="icons/camera.svg" alt=""></button>
       <div id="nvCard" hidden>
-        <p class="lead">When responding to a note, follow the same protocol:</p>
-        <div class="cols">
-          <ol>
-            <li><span class="n">1</span><span>Draw a square on the paper, or use a sticky note.</span></li>
-            <li><span class="n">2</span><span>Write your response inside of the shape, don’t include any personal information.</span></li>
-            <li><span class="n">3</span><span>Scan the QR code with your phone camera to take a photo of your response, or upload one from your gallery.</span></li>
-          </ol>
-          <ol start="4">
-            <li><span class="n">4</span><span>Make sure the whole note is inside the photo, with as little background as possible.</span></li>
-            <li><span class="n">5</span><span>Check if we captured the text from your note accurately.</span></li>
-            <li class="qrSlot"><div id="nvQr" role="img" aria-label="QR code to respond with your phone"></div></li>
-          </ol>
-        </div>
+        <p>Scan the QR code to respond to this note:</p>
+        <div id="nvQr" role="img" aria-label="QR code to respond with your phone"></div>
       </div>
-      <div id="nvBar" hidden><span>Open to responses</span><button type="button" id="nvRespond">Click here to get a response QR code</button></div>
     </div>
   </div>
 
@@ -317,8 +352,10 @@
       </div>
       <div class="step">
         <span class="num">3</span>
-        <img loading="lazy" style="height: calc(145 * var(--k))" src="illustrations/step3.png" alt="A phone scanning a QR code">
-        <p>Scan the QR code with your phone camera to take a photo of your note, or upload one from your gallery.</p>
+        <img class="desk" loading="lazy" style="height: calc(145 * var(--k))" src="illustrations/step3.png" alt="A phone scanning a QR code">
+        <img class="mob" loading="lazy" src="illustrations/step3-phone.png" alt="A hand-drawn “Submit a note” button">
+        <p class="desk">Scan the QR code with your phone camera to take a photo of your note, or upload one from your gallery.</p>
+        <p class="mob">Tap the Submit a note button, and either take a photo of your note or upload one from your gallery.</p>
       </div>
       <div class="step">
         <span class="num">4</span>
@@ -337,7 +374,7 @@
             <div id="qr" role="img" aria-label="QR code: scan with your phone camera"></div>
           </div>
         </div>
-        <a id="openCamera" class="cameraBtn" href="phone.html" hidden>Open the camera</a>
+        <a id="openCamera" class="cameraBtn" href="phone.html" hidden>Submit a note</a>
         <p class="caption" id="qrCaption">Scan with your phone camera</p>
         <p id="addStatus"></p>
       </div>
@@ -409,7 +446,7 @@
   <!-- ---------- CONTACT (Figma: contact-new) ---------- -->
   <section class="page" id="contactPage" aria-label="Contact Us">
     <button class="back" data-close aria-label="Back to the board"><img src="icons/back.svg" alt=""></button>
-    <h1>Contact Us</h1>
+    <h1><span class="desk">Contact Us</span><span class="mob">Contact Common Ground</span></h1>
     <div class="contact">
       <p>You can find us on <a href="#" target="_blank" rel="noopener">Instagram</a>.</p>   <!-- add the Instagram link in href -->
       <p>If you have any questions or want your note to be removed, you can <a href="mailto:">Email us</a> too.</p>   <!-- add your email after mailto: -->
