@@ -36,10 +36,15 @@ const serverOn = CONFIG.SERVER_URL.trim() !== "";
 //  NOTES
 // ============================================================
 const notes = [];
+const responsesFor = {};        // note id → [{ text, image, pending }]
+// preview only: white placeholder responses so the layout can be judged before real ones exist
+Object.entries(CONFIG.RESPONSE_PREVIEW || {}).forEach(([id, count]) => {
+  responsesFor[id] = Array.from({ length: count }, () => ({ placeholder: true }));
+});
 const rnd = () => (Math.random() - 0.5) * 40;
 
 photoNotes.forEach((p, i) => notes.push({
-  id: "p" + i, text: p.text, image: `notes/${p.file}.jpg`, paper: p.paper,
+  id: p.file, text: p.text, image: `notes/${p.file}.jpg`, paper: p.paper,
   allowReplies: p.allowReplies !== false, group: -1
 }));
 typedNotes.forEach((t, i) => notes.push({
@@ -217,12 +222,37 @@ function paintDot(n) {
     m.map = n.__lookTex; m.color.set("#ffffff"); m.needsUpdate = true;
     m.rotation = hashUnit(n.id, 7) * (CONFIG.NOTE_TILT * Math.PI / 180);   // a slight tilt
     n.__dot.scale.setScalar(CONFIG.NOTE_SIZE * LOOK / (LOOK - LOOK_PAD * 2));
+    addResponseBadges(n);
     return;
   }
   const grad = CONFIG.COLOR_BY === "meaning" && !CONFIG.DOT_COLOR && CONFIG.DOT_STYLE !== "ink" && n.blend > 0;
   m.map = grad ? gradientTexture(n.colorA, n.colorB, n.blend) : dotTexture;
   m.color.set(grad ? "#ffffff" : dotColor(n));
   m.needsUpdate = true;
+}
+
+// ---- notes with responses: small notes stuck on the bottom-right corner (like Figma flow 3) ----
+const whiteTex = (() => {
+  const c = document.createElement("canvas"); c.width = c.height = 64;
+  const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+function addResponseBadges(n) {
+  const list = responsesFor[n.id] || [];
+  const want = Math.min(list.length, 2);
+  n.__badges = n.__badges || [];
+  while (n.__badges.length < want) {
+    const r = list[n.__badges.length];
+    const mat = new THREE.SpriteMaterial({ map: whiteTex, transparent: true, depthWrite: false });
+    if (r.image) new THREE.TextureLoader().load(r.image, t => { t.colorSpace = THREE.SRGBColorSpace; mat.map = t; mat.needsUpdate = true; });
+    const b = new THREE.Sprite(mat);
+    const i = n.__badges.length;
+    b.scale.setScalar(0.34);                                   // a third of the note
+    b.position.set(0.3 + i * 0.07, -0.3 - i * 0.05, 0.02 + i * 0.01);   // over the bottom-right corner
+    b.renderOrder = 2;
+    n.__dot.add(b);
+    n.__badges.push(b);
+  }
 }
 
 // read the paper color from a photo: the lighter 60% of pixels is paper, the rest is ink
@@ -464,13 +494,10 @@ async function openNote(node) {
   if (selected) closeNote();
   selected = node;
   controls.autoRotate = false;
-  flyTo(node);
   track("note_open", { id: node.id });
   node.__openedAt = performance.now();
-  if (imageLook()) {                                      // photo notes: just come closer and grow
-    await tween(700, e => node.__group.scale.setScalar(1 + e * (CONFIG.OPEN_SCALE - 1)));
-    return;
-  }
+  if (imageLook()) { showNoteView(node); return; }         // photo notes: the note view (Figma)
+  flyTo(node);
   const m = node.__crumple.mesh;
   m.visible = true; m.material.opacity = 1;
   node.__crumple.setProgress(1);
@@ -485,10 +512,7 @@ async function closeNote() {
   if (!n) return;
   selected = null;
   track("note_close", { id: n.id, seconds: Math.round((performance.now() - n.__openedAt) / 1000) });
-  if (imageLook()) {
-    await tween(500, e => n.__group.scale.setScalar(CONFIG.OPEN_SCALE - e * (CONFIG.OPEN_SCALE - 1)));
-    return;
-  }
+  if (imageLook()) { hideNoteView(); controls.autoRotate = CONFIG.DRIFT_SPEED > 0; return; }
   await tween(600, e => {
     n.__crumple.setProgress(e);
     n.__group.scale.setScalar(CONFIG.OPEN_SCALE - e * (CONFIG.OPEN_SCALE - 1));
@@ -514,10 +538,13 @@ async function start() {
     try {
       const res = await fetch(CONFIG.SERVER_URL + "?action=approved");
       const saved = await res.json();
-      saved.filter(s => !CONFIG.PHOTO_NOTES_ONLY || s.image).forEach(s => notes.push({
-        id: "s" + s.id, text: s.text, image: s.image || null, color: s.color,
-        allowReplies: s.allowReplies, group: -1, fx: rnd(), fy: rnd(), fz: rnd()
-      }));
+      saved.filter(s => !CONFIG.PHOTO_NOTES_ONLY || s.image).forEach(s => {
+        if (s.replyTo) { (responsesFor[s.replyTo] = responsesFor[s.replyTo] || []).push({ text: s.text, image: s.image }); return; }
+        notes.push({
+          id: "s" + s.id, text: s.text, image: s.image || null, color: s.color,
+          allowReplies: s.allowReplies, group: -1, fx: rnd(), fy: rnd(), fz: rnd()
+        });
+      });
       graph.graphData({ nodes: notes, links: [] });
     } catch (e) { console.warn("Could not load saved notes", e); }
   }
@@ -778,7 +805,7 @@ async function startHandoff() {
 
   // 2. BACKUP (Apps Script): asks Google every 1.5 s
   fetch(CONFIG.SERVER_URL + "?action=version").then(r => r.json()).then(v => {
-    if (!(v.version >= 4)) console.warn("Common Ground: the server script (Code.gs) is out of date. Phones can't send notes to this screen until a new version is deployed.");
+    if (!(v.version >= 5)) console.warn("Common Ground: the server script (Code.gs) is out of date. Phones can't send notes to this screen until a new version is deployed.");
   }).catch(() => {});
   pollTimer = setInterval(async () => {
     try {
@@ -885,6 +912,8 @@ const TOUR = [
     image: touch ? null : "illustrations/zoom.png", textAt: [955, 648], imageAt: [955, 713, 409, 221] },
   { id: "open", text: touch ? "Tap a note to open it" : "Click to open a note",
     cursor: "click", from: [688, 544], start: [930, 700], textAt: [894, 837], opensNote: true },
+  { id: "respond", text: touch ? "Tap here to respond to a note" : "Click here to respond to a note",
+    cursor: "click", from: [760, 922], start: [980, 760], textAt: [894, 837], respond: true },
   { id: "add", text: touch ? "Tap here to add a note" : "Click to add a note",
     cursor: "click", from: [756, 89], start: [980, 330], textAt: [894, 837], loop: true },
 ];
@@ -901,7 +930,8 @@ function startTour() {
 function endTour() {
   clearTimeout(tourTimer); clearInterval(tourTimer);
   if (demoAnim) { demoAnim.cancel(); demoAnim = null; }
-  if (tourNote) { closeNote(); tourNote = null; fitCamera(1200); }
+  if (tourNote || viewNote) { closeNote(); tourNote = null; }
+  $("tour").classList.remove("clear");
   controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
   $("tour").hidden = true;
   document.body.classList.remove("touring");
@@ -911,7 +941,7 @@ function endTour() {
 function nextTourStep() {
   clearTimeout(tourTimer); clearInterval(tourTimer);
   if (demoAnim) { demoAnim.cancel(); demoAnim = null; }
-  if (tourNote) { closeNote(); tourNote = null; fitCamera(1200); }   // back to the whole map
+  if (tourNote && !(TOUR[tourStep + 1] || {}).respond) { closeNote(); tourNote = null; }   // keep the note open for the respond step
   tourStep++;
   if (tourStep >= TOUR.length) return endTour();
   const st = TOUR[tourStep], cur = $("tourCursor"), img = $("tourImage");
@@ -944,6 +974,13 @@ function nextTourStep() {
   }
   if (st.id === "rotate" && touch) { controls.autoRotate = true; controls.autoRotateSpeed = 3; }
   // open step: after the click, the note under the cursor opens
+  // respond step: a note is open, the cursor clicks "get a response QR code"
+  $("tour").classList.toggle("clear", !!(st.opensNote || st.respond));   // the note view already greys the map
+  if (st.respond) {
+    if (!viewNote) { const n = noteNear([688, 544]) || notes.find(x => x.allowReplies && x.__group); if (n) { tourNote = n; openNote(n); } }
+    else tourNote = selected;
+    tourTimer = setTimeout(() => { if (TOUR[tourStep] === st && viewNote) startRespond(); }, 2600 * 0.62);
+  }
   if (st.opensNote) {
     tourTimer = setTimeout(() => {
       const n = noteNear(st.from);
@@ -1005,3 +1042,91 @@ try {
 if (!toured && !new URLSearchParams(location.search).has("mine")) {
   setTimeout(() => { if (!document.body.classList.contains("page-open")) startTour(); }, 3200);
 }
+
+// ============================================================
+//  NOTE VIEW (Figma: home-responce-new, home-response-flow-1/2/3)
+//  Click a note: it opens big over a grey veil, its responses around it.
+//  "Click here to get a response QR code" opens the instructions + QR.
+//  A response sent from a phone lands on the note's bottom-right corner.
+// ============================================================
+// where responses sit around the note (Figma placeholder positions, 1512 × 982 frame)
+const RESPONSE_SLOTS = [[881, 615], [995, 743], [356, 251], [245, 383], [97, 307], [198, 585], [881, 403], [1041, 527], [399, 615]];
+let viewNote = null, respondTimer = null, closeRespondLive = null;
+
+function showNoteView(n) {
+  viewNote = n;
+  const v = $("noteView");
+  $("nvImg").src = n.image || "";
+  $("nvImg").alt = n.text;
+  $("nvBar").hidden = !n.allowReplies;
+  $("nvCard").hidden = true;
+  v.classList.remove("responding");
+  drawResponses(n);
+  v.hidden = false;
+}
+function hideNoteView() {
+  stopRespond();
+  $("noteView").hidden = true;
+  viewNote = null;
+}
+function drawResponses(n, animateLast = false) {
+  const box = $("nvResponses"), list = responsesFor[n.id] || [];
+  box.innerHTML = "";
+  list.slice(0, RESPONSE_SLOTS.length).forEach((r, i) => {
+    const el = document.createElement(r.image ? "img" : "div");
+    el.className = "nvResp" + (animateLast && i === list.length - 1 ? " landing" : "");
+    if (r.image) { el.src = r.image; el.alt = r.text || "A response"; }
+    el.style.left = `calc(${RESPONSE_SLOTS[i][0]} * var(--k))`;
+    el.style.top = `calc(${RESPONSE_SLOTS[i][1]} * var(--k))`;
+    box.appendChild(el);
+  });
+}
+
+// "Click here to get a response QR code" → instructions + QR (flow 2)
+async function startRespond() {
+  if (!viewNote) return;
+  const n = viewNote;
+  $("noteView").classList.add("responding");
+  $("nvCard").hidden = false;
+  track("respond_open", { id: n.id });
+  if (!serverOn) return;
+  const session = Math.random().toString(36).slice(2, 8);
+  const url = CONFIG.PHONE_URL + "?s=" + session + "&reply=" + encodeURIComponent(n.id);
+  drawQR($("nvQr"), url);
+  let done = false;
+  const receive = data => {
+    if (done || !viewNote) return;
+    done = true;
+    stopRespond();
+    track("response_arrived", { flag: data.flag });
+    if (data.flag && data.flag !== "ok") return;
+    (responsesFor[n.id] = responsesFor[n.id] || []).push({ text: data.text, image: data.image, pending: true });
+    addResponseBadges(n);
+    $("noteView").classList.remove("responding");          // back to flow 3: the response lands on the corner
+    $("nvCard").hidden = true;
+    drawResponses(n, true);
+  };
+  if (liveOn()) {
+    try {
+      closeRespondLive = await listen(session, room => { if (room.step === "sent" && room.note) receive(room.note); });
+    } catch (e) { console.warn(e); }
+  }
+  respondTimer = setInterval(async () => {
+    try {
+      const d = await (await fetch(CONFIG.SERVER_URL + "?action=session&s=" + session)).json();
+      if (d.status === "received") receive(d);
+    } catch (e) {}
+  }, liveOn() ? 4000 : 1500);
+}
+function stopRespond() {
+  clearInterval(respondTimer); respondTimer = null;
+  if (closeRespondLive) { closeRespondLive(); closeRespondLive = null; }
+}
+$("nvRespond").addEventListener("click", e => { e.stopPropagation(); startRespond(); });
+$("nvCard").addEventListener("click", e => e.stopPropagation());
+$("nvImg").addEventListener("click", e => e.stopPropagation());
+$("noteView").addEventListener("click", () => {             // click the veil: back (card first, then the map)
+  if (!$("nvCard").hidden) { stopRespond(); $("nvCard").hidden = true; $("noteView").classList.remove("responding"); return; }
+  closeNote();
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("noteView").hidden && $("tour").hidden) closeNote(); });

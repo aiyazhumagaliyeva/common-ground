@@ -14,6 +14,7 @@
           "image": { ".validate": "newData.isString() && newData.val().length <= 60000" },
           "allowReplies": { ".validate": "newData.isBoolean()" },
           "flag": { ".validate": "newData.isString() && newData.val().length <= 20" },
+          "replyTo": { ".validate": "newData.isString() && newData.val().length <= 80" },
           "$other": { ".validate": false }
         },
         "$other": { ".validate": false }

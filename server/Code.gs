@@ -8,10 +8,10 @@
 //   5. saves anonymous visit events to the "events" tab (research)
 // ============================================================
 
-const VERSION = 4;   // the website checks this to know the script is up to date
+const VERSION = 5;   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
 
 const SHEET_NAME = "notes";
-const HEADERS = ["id", "createdAt", "status", "flag", "text", "allowReplies", "color", "image", "session", "source"];
+const HEADERS = ["id", "createdAt", "status", "flag", "text", "allowReplies", "color", "image", "session", "source", "replyTo"];
 const EVENT_HEADERS = ["time", "visitor", "visit", "event", "source", "device", "page", "detail"];
 const STATUSES = ["pending", "approved", "rejected", "flagged"];
 
@@ -28,6 +28,7 @@ function getSheet() {
   // older sheets: add missing columns
   if (sh.getRange(1, 9).getValue() !== "session") sh.getRange(1, 9).setValue("session");
   if (sh.getRange(1, 10).getValue() !== "source") sh.getRange(1, 10).setValue("source");
+  if (sh.getRange(1, 11).getValue() !== "replyTo") sh.getRange(1, 11).setValue("replyTo");   // which note a response answers
   return sh;
 }
 
@@ -69,7 +70,7 @@ function doGet(e) {
     const rows = getSheet().getDataRange().getValues().slice(1);
     return json(rows.filter(r => r[2] === "approved").map(r => ({
       id: r[0], text: r[4], allowReplies: r[5] === true || r[5] === "TRUE",
-      color: r[6], image: r[7] || null
+      color: r[6], image: r[7] || null, replyTo: r[10] || ""
     })));
   }
 
@@ -81,7 +82,7 @@ function doGet(e) {
     if (!r) return json({ status: "waiting" });
     return json({
       status: "received", flag: r[3], text: r[3] === "ok" ? r[4] : "",
-      image: r[3] === "ok" ? r[7] : "", allowReplies: r[5] === true
+      image: r[3] === "ok" ? r[7] : "", allowReplies: r[5] === true, replyTo: r[10] || ""
     });
   }
 
@@ -126,7 +127,8 @@ function readPhoto(base64) {
 function saveNote(body) {
   let text = String(body.text || "").trim().slice(0, 600);
   if (!text) return { error: "empty" };
-  if (!/^i\s*wish\s*i\s*could/i.test(text)) text = "I wish I could " + text;
+  const replyTo = String(body.replyTo || "").replace(/[^a-z0-9\-_:]/gi, "").slice(0, 80);
+  if (!replyTo && !/^i\s*wish\s*i\s*could/i.test(text)) text = "I wish I could " + text;   // responses keep their own words
   let image = String(body.image || "");
   if (image.length > 49000) image = "";              // a cell holds max 50,000 characters
   const flag = checkNote(text);
@@ -135,7 +137,7 @@ function saveNote(body) {
   const source = String(body.source || "").replace(/[^a-z0-9\-_]/gi, "").slice(0, 60);
   getSheet().appendRow([
     Utilities.getUuid(), new Date(), status, flag, text,
-    body.allowReplies === true, String(body.color || ""), image, session, source
+    replyTo ? false : body.allowReplies === true, String(body.color || ""), image, session, source, replyTo
   ]);
   if (flag === "self-harm") notifyMe(text);
   return { ok: true, status, flag };
