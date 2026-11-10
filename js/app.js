@@ -361,6 +361,8 @@ graph.width(window.innerWidth).height(window.innerHeight)
   .nodeLabel(n => n.text)
   .nodeThreeObject(makeBall)
   .cooldownTime(2500);
+// Retina screens draw 4× the pixels; above this the map gets laggy (most of all when zoomed in)
+graph.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, CONFIG.MAX_PIXEL_RATIO || 1.5));
 graph.d3Force("charge", null);           // no physics: positions come from meaning
 graph.d3Force("link", null);
 graph.d3Force("center", null);

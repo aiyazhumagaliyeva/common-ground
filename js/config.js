@@ -45,6 +45,7 @@ export const CONFIG = {
   NOTE_SIZE: 15,           // size of one note in 3D
   START_ZOOM: 250,        // closest the camera starts (smaller = closer)
   MAX_ZOOM: 400,          // farthest it starts, when there are many notes
+  MAX_PIXEL_RATIO: 1.5,   // sharpness on Retina screens: 2 = sharpest but laggy, 1 = smoothest but softer
   ZOOM_TO_MOUSE: false,   // true = zoom toward the mouse (map can drift off-center); false = zoom toward the middle
   ZOOM_SPEED: 1.4,        // how fast scrolling zooms (1 = normal)
   NOTE_LOOK: "image",     // "image" = each note shows its photo; "dot" = colored dots + color key
