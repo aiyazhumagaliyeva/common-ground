@@ -543,16 +543,12 @@ function setPos(n, v) {
 // ============================================================
 const touch = matchMedia("(pointer: coarse)").matches;
 const TOUR = [
-  { id: "rotate", text: touch ? "Drag with one finger to rotate the map" : "Press and drag the mouse to rotate the map",
+  { id: "rotate", phone: "Drag with one finger to rotate the map", text: "Press and drag the mouse to rotate the map",
     cursor: "move", from: [671, 532], to: [990, 579], textAt: [894, 837] },
-  { id: "zoom", text: touch ? "Pinch with two fingers to zoom in or zoom out" : "Slide with two fingers on the trackpad or roll the mouse roller to zoom in or zoom out",
-    image: touch ? null : "illustrations/zoom.png", textAt: [955, 648], imageAt: [955, 713, 409, 221] },
-  { id: "open", text: touch ? "Tap a note to open it" : "Click to open a note",
+  { id: "zoom", phone: "Pinch with two fingers to zoom in or zoom out", text: "Slide with two fingers on the trackpad or roll the mouse roller to zoom in or zoom out",
+    image: "illustrations/zoom.png", textAt: [955, 648], imageAt: [955, 713, 409, 221] },
+  { id: "open", phone: "Tap a note to open it", text: "Click to open a note",
     cursor: "click", from: [688, 544], start: [930, 700], textAt: [894, 837], opensNote: true },
-  { id: "respond", text: touch ? "Tap here to respond to a note" : "Click here to respond to a note",
-    cursor: "click", from: [756, 806], start: [980, 700], textAt: [894, 850], respond: true },
-  { id: "add", text: touch ? "Tap here to add a note" : "Click to add a note",
-    cursor: "click", from: [756, 89], start: [980, 330], textAt: [894, 837], loop: true },
 ];
 let tourStep = -1, tourNote = null, tourTimer = null;
 
@@ -574,7 +570,11 @@ function startZoomDemo() {
   zoomDemoFrom = cam.position.clone();
   const near = t.clone().add(zoomDemoFrom.clone().sub(t).multiplyScalar(0.45));
   let zoomedIn = false;
-  const step = () => { zoomedIn = !zoomedIn; graph.cameraPosition(zoomedIn ? near : zoomDemoFrom, t, 1300); };
+  const step = () => {
+    zoomedIn = !zoomedIn;
+    graph.cameraPosition(zoomedIn ? near : zoomDemoFrom, t, 1300);
+    if ($("tourCursor").classList.contains("hand")) $("tourCursor").src = zoomedIn ? "icons/hand-spread.png" : "icons/hand-pinch.png";
+  };
   step();
   zoomDemoTimer = setInterval(step, 2200);
 }
@@ -599,31 +599,33 @@ function nextTourStep() {
   stopZoomDemo();
   clearTimeout(tourTimer); clearInterval(tourTimer);
   if (demoAnim) { demoAnim.cancel(); demoAnim = null; }
-  if (tourNote && !(TOUR[tourStep + 1] || {}).respond) { closeNote(); tourNote = null; }   // keep the note open for the respond step
+  if (tourNote) { closeNote(); tourNote = null; }
   tourStep++;
   if (tourStep >= TOUR.length) return endTour();
   const st = TOUR[tourStep], cur = $("tourCursor"), img = $("tourImage");
   const at = (el, x, y) => { el.style.left = `calc(${x} * var(--k))`; el.style.top = `calc(${y} * var(--k))`; };
-  $("tourText").textContent = st.text;
-  $("tourHint").textContent = `${touch ? "Tap" : "Click"} anywhere to continue · ${tourStep + 1} of ${TOUR.length}`;
+  $("tourText").textContent = touch || isPhone() ? st.phone : st.text;
+  $("tourHint").textContent = `${touch || isPhone() ? "Tap" : "Click"} anywhere to continue · ${tourStep + 1} of ${TOUR.length}`;
   if (!$("tourCopy").classList.contains("phone")) at($("tourCopy"), st.textAt[0], st.textAt[1]);
-  // drawing (zoom step)
-  img.hidden = !st.image;
-  if (st.image) {                                  // drawing sits under the text, so they never overlap
+  const hand = touch || isPhone();
+  // drawing (zoom step, laptop only: phones get the pinching hand instead)
+  img.hidden = !st.image || hand;
+  if (st.image && !hand) {                                  // drawing sits under the text, so they never overlap
     img.src = st.image;
     img.style.width = `calc(${st.imageAt[2]} * var(--k))`;
   }
-  // the white cursor (not on phones)
-  cur.hidden = !st.cursor || touch;
-  cur.className = "";
+  // the white cursor on a laptop; hand drawings on a phone (pointing finger, pinch, tap)
+  cur.hidden = !st.cursor && !(hand && st.id === "zoom");
+  cur.className = hand ? "hand" : "";
   controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
-  if (st.cursor && !touch) {
-    cur.src = st.cursor === "click" ? "icons/cursor-click.svg" : "icons/cursor.svg";
+  if (hand && st.id === "zoom") { cur.src = "icons/hand-spread.png"; at(cur, 700, 470); }
+  if (st.cursor) {
+    cur.src = hand ? "icons/hand-point.png" : st.cursor === "click" ? "icons/cursor-click.svg" : "icons/cursor.svg";
     at(cur, st.from[0], st.from[1]);
     if (st.to) {                                   // rotate: the cursor drags across while the map turns
       cur.style.setProperty("--dx", `calc(${st.to[0] - st.from[0]} * var(--k))`);
       cur.style.setProperty("--dy", `calc(${st.to[1] - st.from[1]} * var(--k))`);
-      cur.className = "drag";
+      cur.className = hand ? "hand drag" : "drag";
       controls.autoRotate = true;
       controls.autoRotateSpeed = 3;
     } else if (st.start) {                         // open / add: the cursor glides in, then clicks
@@ -631,15 +633,9 @@ function nextTourStep() {
     }
   }
   if (st.id === "zoom") startZoomDemo();
-  if (st.id === "rotate" && touch) { controls.autoRotate = true; controls.autoRotateSpeed = 3; }
+
   // open step: after the click, the note under the cursor opens
-  // respond step: a note is open, the cursor clicks "get a response QR code"
-  $("tour").classList.toggle("clear", !!(st.respond && viewNote));   // the note view already greys the map (no white flash)
-  if (st.respond) {
-    if (!viewNote) { const n = noteNear([688, 544]) || notes.find(x => x.allowReplies && x.__group); if (n) { tourNote = n; openNote(n); } }
-    else tourNote = selected;
-    tourTimer = setTimeout(() => { if (TOUR[tourStep] === st && viewNote && !phoneView()) startRespond(); }, 2600 * 0.62 + (viewNote ? 0 : 800));
-  }
+  $("tour").classList.remove("clear");
   if (st.opensNote) {
     tourTimer = setTimeout(() => {
       const n = noteNear(st.from);
@@ -652,7 +648,8 @@ let demoAnim = null;
 function clickDemo(cur, st) {
   const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--k")) || 1;
   const dx = (st.start[0] - st.from[0]) * k, dy = (st.start[1] - st.from[1]) * k;
-  cur.src = "icons/cursor.svg";
+  const hand = cur.classList.contains("hand");
+  cur.src = hand ? "icons/hand-point.png" : "icons/cursor.svg";
   if (demoAnim) demoAnim.cancel();
   demoAnim = cur.animate([
     { transform: `translate(${dx}px, ${dy}px)`, opacity: 0, offset: 0 },
@@ -666,8 +663,8 @@ function clickDemo(cur, st) {
   // switch to the "clicking" cursor at the moment of the press
   const swap = () => {
     if (TOUR[tourStep] !== st) return;
-    cur.src = "icons/cursor-click.svg";
-    setTimeout(() => { if (TOUR[tourStep] === st) cur.src = "icons/cursor.svg"; }, 700);
+    cur.src = hand ? "icons/hand-tap.png" : "icons/cursor-click.svg";
+    setTimeout(() => { if (TOUR[tourStep] === st) cur.src = hand ? "icons/hand-point.png" : "icons/cursor.svg"; }, 700);
   };
   setTimeout(swap, 2600 * 0.5);
   if (st.loop) tourTimer = setInterval(swap, 2600);
