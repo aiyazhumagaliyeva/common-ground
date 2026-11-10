@@ -170,6 +170,9 @@
       font-size: max(15px, calc(20 * var(--k)));
     }
     .step img { height: calc(184 * var(--k)); width: auto; max-width: 100%; object-fit: contain; }
+    /* every drawing sits in a box of the same height, so the text under them lines up */
+    .step .pic { height: calc(184 * var(--k)); width: 100%; display: flex; align-items: center; justify-content: center; }
+    .step .pic img { max-height: 100%; }
     .step p {
       text-align: center; text-wrap: pretty; line-height: normal; margin-top: calc(20 * var(--k));
       font-size: max(14px, calc(20 * var(--k))); max-width: calc(400 * var(--k));
@@ -268,6 +271,7 @@
       .step .num { width: 34px; font-size: 20px; }
       .step img { height: 150px; }
       .step img.mob { height: 96px; display: block; }
+      .step .pic { height: 150px; }
       .step p { font-size: 16px; margin-top: 20px; max-width: none; }
       .qrCard .caption, #addStatus:empty { display: none; }
       .cameraBtn, .cameraBtn[hidden] { position: fixed; left: 50%; right: auto; transform: translateX(-50%); bottom: calc(57px + env(safe-area-inset-bottom, 0px));
@@ -346,29 +350,39 @@
     <div class="steps">
       <div class="step">
         <span class="num">1</span>
-        <img loading="lazy" style="height: calc(173 * var(--k))" src="illustrations/step1.png" alt="A sticky note pad and a hand drawing a square on paper">
+        <div class="pic">
+          <img loading="lazy" style="height: calc(173 * var(--k))" src="illustrations/step1.png" alt="A sticky note pad and a hand drawing a square on paper">
+        </div>
         <p>Draw a square on the paper, or use a sticky note.</p>
       </div>
       <div class="step">
         <span class="num">2</span>
-        <img loading="lazy" style="height: calc(184 * var(--k))" src="illustrations/step2.png" alt="A note that starts with “I wish I could…”">
+        <div class="pic">
+          <img loading="lazy" style="height: calc(184 * var(--k))" src="illustrations/step2.png" alt="A note that starts with “I wish I could…”">
+        </div>
         <p>Inside the square, write “I wish I could” and complete the sentence. Please don’t include names or contact information in your note.</p>
       </div>
       <div class="step">
         <span class="num">3</span>
-        <img class="desk" loading="lazy" style="height: calc(145 * var(--k))" src="illustrations/step3.png" alt="A phone scanning a QR code">
-        <img class="mob" loading="lazy" src="illustrations/step3-phone.png" alt="A hand-drawn “Submit a note” button">
+        <div class="pic">
+          <img class="desk" loading="lazy" style="height: calc(145 * var(--k))" src="illustrations/step3.png" alt="A phone scanning a QR code">
+          <img class="mob" loading="lazy" src="illustrations/step3-phone.png" alt="A hand-drawn “Submit a note” button">
+        </div>
         <p class="desk">Scan the QR code with your phone camera to take a photo of your note, or upload one from your gallery.</p>
         <p class="mob">Tap the Submit a note button, and either take a photo of your note or upload one from your gallery.</p>
       </div>
       <div class="step">
         <span class="num">4</span>
-        <img loading="lazy" style="height: calc(184 * var(--k))" src="illustrations/step4.png" alt="A phone taking a photo of a note">
+        <div class="pic">
+          <img loading="lazy" style="height: calc(184 * var(--k))" src="illustrations/step4.png" alt="A phone taking a photo of a note">
+        </div>
         <p>Make sure the whole note is inside the photo, with as little background as possible.</p>
       </div>
       <div class="step">
         <span class="num">5</span>
-        <img loading="lazy" style="height: calc(184 * var(--k))" src="illustrations/step5.png" alt="A phone showing the note with two buttons">
+        <div class="pic">
+          <img loading="lazy" style="height: calc(184 * var(--k))" src="illustrations/step5.png" alt="A phone showing the note with two buttons">
+        </div>
         <p>Check if we captured the text from your note accurately.</p>
       </div>
       <div class="qrCard">
