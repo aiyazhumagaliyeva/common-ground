@@ -1,7 +1,7 @@
 # Common Ground — setup
 
 ## Run it now (demo mode)
-1. Put this whole folder where your old `common-ground` folder is. Your own `text.svg`, `world.svg`, `lock.svg` must be in the same folder.
+1. Put this whole folder where your old `common-ground` folder is.
 2. Open the folder in VS Code → right-click `index.html` → **Open with Live Server**.
 3. Wait ~5 seconds. The AI model downloads once, then the notes move into their groups.
 

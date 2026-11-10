@@ -1,18 +1,15 @@
 // ============================================================
-//  COMMON GROUND — map + writing flow
+//  COMMON GROUND — the 3D map of notes
 // ============================================================
 // exact versions, built for Safari too (target=es2020), sharing ONE Three.js
 import ForceGraph3D from 'https://esm.sh/3d-force-graph@1.80.1?deps=three@0.181.0&target=es2020';
 import * as THREE from 'https://esm.sh/three@0.181.0?target=es2020';
 import { CONFIG } from './config.js';
 import { embed, layout, knownVector, loadModel } from './cluster.js';
-import { checkNote } from './safety.js';
-import { photoNotes, typedNotes } from './seed.js';
+import { photoNotes } from './seed.js';
 import { drawQR } from './qr.js';
-import { makeCrumple } from './crumple.js';
 import { liveOn, listen } from './live.js';
 import { makeGlass } from './glass.js';
-import { colorByMeaning } from './colors.js';
 import { track, startTracking, SOURCE, optOut, optedOut } from './track.js';
 
 startTracking("map");
@@ -20,16 +17,6 @@ makeGlass(document.getElementById("nav"));      // liquid glass menu (settings f
 
 const $ = id => document.getElementById(id);
 window.appStarted = true;
-
-// ---- COLORS ----
-const noteColors  = ["#7BB8FF", "#F5A84A", "#FFEE7A", "#8BE35B", "#F58BD8", "#B98BF5", "#F05050"];
-const groupColors = ["#2557A7", "#C2410C", "#15803D", "#7E22CE", "#BE123C", "#0E7490", "#A16207", "#4D7C0F", "#9D174D", "#334155"];
-
-// ---- STATE ----
-let chosenColor = noteColors[0];
-let allowReplies = true;
-let mode = "write";           // "write" or "photo"
-let photo = null;             // { thumb: dataURL } after a photo is chosen
 const serverOn = CONFIG.SERVER_URL.trim() !== "";
 
 // ============================================================
@@ -43,21 +30,49 @@ Object.entries(CONFIG.RESPONSE_PREVIEW || {}).forEach(([id, count]) => {
 });
 const rnd = () => (Math.random() - 0.5) * 40;
 
-photoNotes.forEach((p, i) => notes.push({
-  id: p.file, text: p.text, image: `notes/${p.file}.jpg`, paper: p.paper,
+photoNotes.forEach(p => notes.push({
+  id: p.file, text: p.text, image: `notes/${p.file}.jpg`,
   allowReplies: p.allowReplies !== false, group: -1
-}));
-typedNotes.forEach((t, i) => notes.push({
-  id: "t" + i, text: "I wish I could " + t,
-  color: noteColors[i % noteColors.length], allowReplies: i % 3 !== 0, group: -1
 }));
 notes.forEach(n => { n.fx = n.x = rnd(); n.fy = n.y = rnd(); n.fz = n.z = rnd(); });
 
 // ============================================================
-//  DRAWING ONE NOTE (a square image made in code)
+//  ONE NOTE ON THE MAP = its photo as a flat piece of paper,
+//  with a soft shadow and a slight tilt, always facing you.
 // ============================================================
+let introPending = true;              // notes stay tiny until the opening animation
+const LOOK = 512, LOOK_PAD = 40;      // picture size; extra room around the paper for the shadow
+const hashUnit = (id, k) => {         // stable number between -1 and 1 per note
+  let h = 2166136261 ^ k;
+  for (const ch of String(id)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return ((h >>> 0) % 20001) / 10000 - 1;
+};
+
+// draws the paper (photo + shadow) into the note's picture
+function paintNote(n) {
+  const c = document.createElement("canvas"); c.width = c.height = LOOK;
+  const g = c.getContext("2d"), S = LOOK - LOOK_PAD * 2, x = LOOK_PAD, y = LOOK_PAD;
+  if (CONFIG.NOTE_SHADOW) {
+    g.save();
+    g.shadowColor = "rgba(0,0,0,0.22)"; g.shadowBlur = 26; g.shadowOffsetY = 12;
+    g.fillStyle = "#fff"; g.fillRect(x, y, S, S);
+    g.restore();
+  }
+  if (n.__img && n.__img.naturalWidth) {
+    g.drawImage(n.__img, x, y, S, S);                    // the photo
+  } else {                                               // no photo: plain paper with the words
+    g.fillStyle = "#f3e6a8"; g.fillRect(x, y, S, S);
+    g.fillStyle = "#222"; g.font = "32px Helvetica, Arial, sans-serif";
+    wrapText(g, n.text, S - 60).slice(0, 10).forEach((l, i) => g.fillText(l, x + 30, y + 60 + i * 40));
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const m = n.__note.material;
+  if (m.map) m.map.dispose();
+  m.map = tex; m.opacity = 1; m.needsUpdate = true;
+}
 function wrapText(ctx, text, maxWidth) {
-  const words = text.split(" "), lines = [];
+  const words = String(text).split(" "), lines = [];
   let line = "";
   for (const w of words) {
     const test = line ? line + " " + w : w;
@@ -68,169 +83,6 @@ function wrapText(ctx, text, maxWidth) {
   return lines;
 }
 
-function paint(node) {
-  const S = 512, ctx = node.__ctx;
-  ctx.clearRect(0, 0, S, S);
-  if (node.__img && node.__img.complete && node.__img.naturalWidth) {
-    ctx.drawImage(node.__img, 0, 0, S, S);                      // the photo
-  } else {
-    ctx.fillStyle = node.color || "#FFF6B8";                    // typed note
-    ctx.fillRect(0, 0, S, S);
-    ctx.fillStyle = "#111111";
-    ctx.font = "500 40px Inter, sans-serif";
-    wrapText(ctx, node.text, S - 80).slice(0, 9)
-      .forEach((l, i) => ctx.fillText(l, 40, 76 + i * 50));
-  }
-  if (CONFIG.SHOW_GROUP_FRAMES && node.group >= 0) {          // group frame (off)
-    ctx.strokeStyle = groupColors[node.group % groupColors.length];
-    ctx.lineWidth = 18;
-    ctx.strokeRect(9, 9, S - 18, S - 18);
-  }
-  node.__tex.needsUpdate = true;
-}
-
-// ============================================================
-//  ONE NOTE = a flat dot on the map.
-//  The paper (photo) only appears when a note arrives or is opened:
-//  it unfolds out of the dot / crumples back into it.
-// ============================================================
-let introPending = true;              // dots stay hidden until the opening animation
-
-// soft round dot texture (shared)
-const dotTexture = (() => {
-  const c = document.createElement("canvas");
-  c.width = c.height = 128;
-  const g = c.getContext("2d");
-  g.beginPath(); g.arc(64, 64, 60, 0, Math.PI * 2); g.fillStyle = "#fff"; g.fill();
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-})();
-
-// the dot is the color of the note's paper
-function dotColor(node) {
-  if (CONFIG.DOT_STYLE === "ink") return "#2b2b2b";
-  if (CONFIG.DOT_COLOR) return CONFIG.DOT_COLOR;          // one color for every dot
-  if (CONFIG.COLOR_BY === "meaning") return node.colorA || CONFIG.DOT_COLORS[0];
-  const list = CONFIG.DOT_COLORS || [];
-  if (list.length) {                                      // random sticky-note color, fixed per note
-    let h = 0;
-    for (const ch of String(node.id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-    return list[h % list.length];
-  }
-  return node.paper || node.color || "#d3cfab";
-}
-// gradient dot: a note between two meanings shows both colors
-const gradCache = new Map();
-function gradientTexture(a, b, blend) {
-  const key = a + b + blend.toFixed(2);
-  if (gradCache.has(key)) return gradCache.get(key);
-  const c = document.createElement("canvas"); c.width = c.height = 128;
-  const g = c.getContext("2d");
-  const lg = g.createLinearGradient(20, 20, 108, 108);     // top-left → bottom-right
-  lg.addColorStop(0, a);
-  lg.addColorStop(Math.max(0, 0.5 - blend), a);           // more blend = more of the second color
-  lg.addColorStop(1, b);
-  g.beginPath(); g.arc(64, 64, 60, 0, Math.PI * 2); g.fillStyle = lg; g.fill();
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  gradCache.set(key, t);
-  return t;
-}
-const imageLook = () => CONFIG.NOTE_LOOK === "image";
-
-// ============================================================
-//  THE NOTE AS PAPER: shadow, curled corner, paper color by group
-//  (drawn into its own picture, so the original photo stays untouched)
-// ============================================================
-const LOOK = 512, LOOK_PAD = 40;                          // extra room around the paper for the shadow
-const hashUnit = (id, k) => {                             // stable number between -1 and 1 per note
-  let h = 2166136261 ^ k;
-  for (const ch of String(id)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
-  return ((h >>> 0) % 20001) / 10000 - 1;
-};
-const rgbOf = hex => { const v = parseInt(hex.slice(1), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
-
-function paperTint(n) {
-  if (!CONFIG.PAPER_BY_GROUP) return "";
-  if (n.group >= 0) return CONFIG.GROUP_PAPERS[n.group % CONFIG.GROUP_PAPERS.length];
-  return CONFIG.NO_GROUP_PAPER;
-}
-
-function paintLook(n) {
-  if (!n.__lookCtx) {
-    const c = document.createElement("canvas"); c.width = c.height = LOOK;
-    n.__lookCtx = c.getContext("2d");
-    n.__lookTex = new THREE.CanvasTexture(c);
-    n.__lookTex.colorSpace = THREE.SRGBColorSpace;
-  }
-  const tint = paperTint(n);
-  const loaded = !n.__img || (n.__img.complete && n.__img.naturalWidth > 0);
-  const key = tint + "|" + loaded;
-  if (n.__lookKey === key) return;                       // nothing changed
-  n.__lookKey = key;
-
-  const S = LOOK - LOOK_PAD * 2;
-  // 1. the photo, re-colored: the paper becomes the group's paper color, the ink stays ink
-  const t = document.createElement("canvas"); t.width = t.height = S;
-  const tg = t.getContext("2d", { willReadFrequently: true });
-  tg.drawImage(n.__ctx.canvas, 0, 0, S, S);
-  if (tint && loaded && n.image) {
-    const d = tg.getImageData(0, 0, S, S), px = d.data;
-    const pr = rgbOf(n.paper || "#e6d69c"), tr = rgbOf(tint);
-    for (let i = 0; i < px.length; i += 4) {
-      for (let k = 0; k < 3; k++) {
-        const tinted = Math.min(1, px[i + k] / pr[k]) * tr[k];
-        px[i + k] = px[i + k] + (tinted - px[i + k]) * CONFIG.TINT_STRENGTH;   // weaker = closer to the original paper
-      }
-    }
-    tg.putImageData(d, 0, 0);
-  }
-
-  // 2. the paper shape with a curled bottom-right corner, and its shadow
-  const g = n.__lookCtx, x = LOOK_PAD, y = LOOK_PAD, f = CONFIG.NOTE_CURL ? S * 0.09 : 0;
-  g.clearRect(0, 0, LOOK, LOOK);
-  const shape = () => {
-    g.beginPath();
-    g.moveTo(x, y); g.lineTo(x + S, y); g.lineTo(x + S, y + S - f);
-    g.lineTo(x + S - f, y + S); g.lineTo(x, y + S); g.closePath();
-  };
-  if (CONFIG.NOTE_SHADOW) {
-    g.save();
-    g.shadowColor = "rgba(0,0,0,0.22)"; g.shadowBlur = 26; g.shadowOffsetY = 12;
-    shape(); g.fillStyle = "#fff"; g.fill();
-    g.restore();
-  }
-  g.save(); shape(); g.clip(); g.drawImage(t, x, y); g.restore();
-  if (f) {                                                // the folded-over corner
-    const c = tint || n.paper || "#e6d69c";
-    const grad = g.createLinearGradient(x + S - f, y + S - f, x + S - f / 2, y + S - f / 2);
-    grad.addColorStop(0, c); grad.addColorStop(1, "#ffffff");
-    g.save();
-    g.shadowColor = "rgba(0,0,0,0.25)"; g.shadowBlur = 6; g.shadowOffsetX = -2; g.shadowOffsetY = -2;
-    g.beginPath(); g.moveTo(x + S, y + S - f); g.lineTo(x + S - f, y + S - f); g.lineTo(x + S - f, y + S); g.closePath();
-    g.fillStyle = grad; g.fill();
-    g.restore();
-  }
-  n.__lookTex.needsUpdate = true;
-}
-function paintDot(n) {
-  const m = n.__dot && n.__dot.material;
-  if (!m) return;
-  if (imageLook()) {                                      // the note's photo, flat, always facing you
-    paintLook(n);
-    m.map = n.__lookTex; m.color.set("#ffffff"); m.needsUpdate = true;
-    m.rotation = hashUnit(n.id, 7) * (CONFIG.NOTE_TILT * Math.PI / 180);   // a slight tilt
-    n.__dot.scale.setScalar(CONFIG.NOTE_SIZE * LOOK / (LOOK - LOOK_PAD * 2));
-    addResponseBadges(n);
-    return;
-  }
-  const grad = CONFIG.COLOR_BY === "meaning" && !CONFIG.DOT_COLOR && CONFIG.DOT_STYLE !== "ink" && n.blend > 0;
-  m.map = grad ? gradientTexture(n.colorA, n.colorB, n.blend) : dotTexture;
-  m.color.set(grad ? "#ffffff" : dotColor(n));
-  m.needsUpdate = true;
-}
-
 // ---- notes with responses: small notes stuck on the bottom-right corner (like Figma flow 3) ----
 const whiteTex = (() => {
   const c = document.createElement("canvas"); c.width = c.height = 64;
@@ -238,6 +90,7 @@ const whiteTex = (() => {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 })();
 function addResponseBadges(n) {
+  if (!n.__note) return;
   const list = responsesFor[n.id] || [];
   const want = Math.min(list.length, 2);
   n.__badges = n.__badges || [];
@@ -250,86 +103,31 @@ function addResponseBadges(n) {
     b.scale.setScalar(0.34);                                   // a third of the note
     b.position.set(0.3 + i * 0.07, -0.3 - i * 0.05, 0.02 + i * 0.01);   // over the bottom-right corner
     b.renderOrder = 2;
-    n.__dot.add(b);
+    n.__note.add(b);
     n.__badges.push(b);
   }
 }
 
-// read the paper color from a photo: the lighter 60% of pixels is paper, the rest is ink
-function paperColor(img) {
-  const c = document.createElement("canvas"); c.width = c.height = 32;
-  const g = c.getContext("2d", { willReadFrequently: true });
-  g.drawImage(img, 0, 0, 32, 32);
-  const d = g.getImageData(0, 0, 32, 32).data, px = [];
-  for (let i = 0; i < d.length; i += 4) px.push([d[i], d[i + 1], d[i + 2]]);
-  px.sort((a, b) => (a[0] + a[1] + a[2]) - (b[0] + b[1] + b[2]));
-  const paper = px.slice(Math.floor(px.length * 0.4));
-  const mid = k => paper.map(p => p[k]).sort((a, b) => a - b)[paper.length >> 1];
-  return "#" + [0, 1, 2].map(k => mid(k).toString(16).padStart(2, "0")).join("");
-}
-
-function makeBall(node) {
-  // the paper texture (photo, or typed text)
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 512;
-  node.__ctx = canvas.getContext("2d");
-  node.__tex = new THREE.CanvasTexture(canvas);
-  node.__tex.colorSpace = THREE.SRGBColorSpace;
-  if (node.image) {
-    node.__img = new Image();
-    node.__img.onload = () => {
-      paint(node);
-      if (!node.paper) {                                   // new photos: measure the paper
-        try { node.paper = paperColor(node.__img); } catch (e) {}
-      }
-      node.__lookKey = null;
-      paintDot(node);
-    };
-    node.__img.src = node.image;
-  }
-  paint(node);
-
+// the 3D object for one note (3d-force-graph calls this once per note)
+function makeNote(node) {
   const group = new THREE.Group();
   node.__group = group;
-
-  // the dot (always faces you, never shaded)
-  const dot = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTexture, color: dotColor(node), transparent: true }));
-  dot.scale.setScalar(CONFIG.DOT_SIZE);
-  node.__dot = dot;
-  paintDot(node);
-  group.add(dot);
-
-  // the paper: hidden until needed
-  const seed = [...String(node.id)].reduce((a, c) => a + c.charCodeAt(0), 0) % 97;
-  node.__crumple = makeCrumple(THREE, node.__tex, CONFIG.NOTE_SIZE * 1.6, seed);
-  node.__phase = seed;
-  node.__crumple.mesh.visible = false;
-  group.add(node.__crumple.mesh);
-
-  if (node.__arriving) {                                 // new note: flat paper, big, no dot yet
-    node.__crumple.setProgress(0);
-    node.__crumple.mesh.visible = true;
-    dot.visible = false;
-    group.scale.setScalar(CONFIG.ARRIVE_SCALE);
-  } else if (introPending) {
-    group.scale.setScalar(0.001);                        // pops in during the intro
-  }
+  const note = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0 }));   // invisible until the photo loads
+  note.material.rotation = hashUnit(node.id, 7) * (CONFIG.NOTE_TILT * Math.PI / 180);         // a slight tilt
+  note.scale.setScalar(CONFIG.NOTE_SIZE * LOOK / (LOOK - LOOK_PAD * 2));
+  node.__note = note;
+  node.__phase = [...String(node.id)].reduce((a, c) => a + c.charCodeAt(0), 0) % 97;   // so notes float out of step
+  group.add(note);
+  if (node.image) {
+    node.__img = new Image();
+    node.__img.onload = () => paintNote(node);
+    node.__img.onerror = () => paintNote(node);
+    node.__img.src = node.image;
+  } else paintNote(node);
+  addResponseBadges(node);
+  if (node.__arriving) group.scale.setScalar(CONFIG.ARRIVE_SCALE);   // new note: big while it flies in
+  else if (introPending) group.scale.setScalar(0.001);              // pops in during the intro
   return group;
-}
-
-// paper → dot: shrink the ball away and fade the dot in
-async function paperToDot(n, ms = 500) {
-  const m = n.__crumple.mesh, d = n.__dot;
-  d.visible = true;
-  d.material.opacity = 0;
-  const s0 = n.__group.scale.x;
-  await tween(ms, e => {
-    m.scale.setScalar(1 - e * 0.85);
-    m.material.opacity = 1 - e;
-    d.material.opacity = e;
-    n.__group.scale.setScalar(s0 + (1 - s0) * e);
-  });
-  m.visible = false; m.scale.setScalar(1); m.material.opacity = 1;
 }
 
 // ---- small animation helpers ----
@@ -359,7 +157,7 @@ graph.width(window.innerWidth).height(window.innerHeight)
   .showNavInfo(false)
   .enableNodeDrag(false)                 // dragging always turns the whole map, never moves one note
   .nodeLabel(n => n.text)
-  .nodeThreeObject(makeBall)
+  .nodeThreeObject(makeNote)
   .cooldownTime(2500);
 // Retina screens draw 4× the pixels; above this the map gets laggy (most of all when zoomed in)
 graph.renderer().setPixelRatio(Math.min(window.devicePixelRatio || 1, CONFIG.MAX_PIXEL_RATIO || 1.5));
@@ -380,21 +178,14 @@ controls.autoRotate = true;           // slow drift until someone touches the ma
 controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
 controls.addEventListener("start", () => (controls.autoRotate = false));
 
-// ---- every frame: dots float gently; paper faces you ----
+// ---- every frame: notes float gently and face you ----
 function tick(now) {
   const cam = graph.camera(), t = now / 1000;
   notes.forEach(n => {
     const g = n.__group;
     if (!g) return;
     g.quaternion.copy(cam.quaternion);                    // paper always faces the camera
-    const bob = Math.sin(t * 0.8 + n.__phase) * CONFIG.NOTE_SIZE * CONFIG.FLOAT;
-    n.__dot.position.y = bob;
-    const m = n.__crumple.mesh;
-    if (m.visible && n.__crumple.progress >= 0.999 && !n.__arriving) {
-      m.rotation.x += 0.004; m.rotation.y += 0.006;      // a crumpled ball tumbles a bit
-    } else {
-      m.rotation.x *= 0.85; m.rotation.y *= 0.85;
-    }
+    n.__note.position.y = Math.sin(t * 0.8 + n.__phase) * CONFIG.NOTE_SIZE * CONFIG.FLOAT;
     if (n.__pos) {                                        // arrival animation controls it
       g.position.copy(n.__pos);
       n.x = n.fx = n.__pos.x; n.y = n.fy = n.__pos.y; n.z = n.fz = n.__pos.z;
@@ -434,40 +225,8 @@ function regroup() {
     if (n.vec || n.tx !== undefined) return;
     n.tx = rnd() * 0.6; n.ty = rnd() * 0.6; n.tz = rnd() * 0.6;
   });
-  const key = colorByMeaning(notes);                      // colors follow meaning
-  notes.forEach(paintDot);
-  drawKey(key);
+  notes.forEach(addResponseBadges);                       // responses loaded from the server show on the map
   animateToTargets();
-  // (no status text in the corner)
-}
-
-// ---- the color key (bottom left) ----
-function drawKey(key) {
-  const box = $("colorKey");
-  if (!box) return;
-  if (imageLook() || CONFIG.COLOR_BY !== "meaning" || CONFIG.DOT_COLOR || !key.groups.length) { box.hidden = true; return; }
-  box.hidden = false;
-  const rows = key.groups.map(g =>
-    `<li><button type="button" data-group="${g.id}"><i style="background:${g.color}"></i>` +
-    `<span>${g.name.replace(/</g, "&lt;")}</span><em>${g.count}</em></button></li>`).join("");
-  const c = key.groups.map(g => g.color);
-  const between = key.mixed ? `<li class="between"><i style="background:linear-gradient(135deg, ${c[0]} 35%, ${c[1] || c[0]})"></i>` +
-    `<span>In between two meanings</span><em>${key.mixed}</em></li>` : "";
-  box.innerHTML = `<p>Color = meaning</p><ul>${rows}${between}</ul>`;
-  box.querySelectorAll("button[data-group]").forEach(b => b.addEventListener("click", () => flyToGroup(+b.dataset.group)));
-}
-// click a row in the key: the camera flies to that group
-function flyToGroup(id) {
-  const g = notes.filter(n => n.group === id && n.tx !== undefined);
-  if (!g.length) return;
-  if (selected) closeNote();
-  controls.autoRotate = false;
-  const c = g.reduce((a, n) => [a[0] + n.tx / g.length, a[1] + n.ty / g.length, a[2] + n.tz / g.length], [0, 0, 0]);
-  const r = Math.max(30, ...g.map(n => Math.hypot(n.tx - c[0], n.ty - c[1], n.tz - c[2])));
-  const L = Math.hypot(...c) || 1, d = r * 3.2;
-  graph.cameraPosition({ x: c[0] + (c[0] / L) * d, y: c[1] + (c[1] / L) * d, z: c[2] + (c[2] / L) * d },
-                       { x: c[0], y: c[1], z: c[2] }, 1400);
-  track("key_click", { group: id });
 }
 
 // start zoom depends on how many notes there are:
@@ -489,47 +248,32 @@ function flyTo(node, ms = 1500) {
                        { x: node.tx, y: node.ty, z: node.tz }, ms);
 }
 
-// ---- click a ball: it flies close and unfolds into the note ----
+// ---- click a note: the camera flies close, then the note view opens ----
 let selected = null, openViewTimer = null;
-async function openNote(node) {
+function openNote(node) {
   if (selected === node || node.__arriving) return;
   if (selected) closeNote();
   selected = node;
   controls.autoRotate = false;
   track("note_open", { id: node.id });
   node.__openedAt = performance.now();
-  if (imageLook()) {                                     // photo notes: fly in close, then the note view (Figma)
-    flyTo(node, 1100);
-    clearTimeout(openViewTimer);
-    openViewTimer = setTimeout(() => { if (selected === node) showNoteView(node); }, 750);
-    return;
-  }
-  flyTo(node);
-  const m = node.__crumple.mesh;
-  m.visible = true; m.material.opacity = 1;
-  node.__crumple.setProgress(1);
-  node.__dot.visible = false;
-  await tween(900, e => {
-    node.__crumple.setProgress(1 - e);
-    node.__group.scale.setScalar(1 + e * (CONFIG.OPEN_SCALE - 1));
-  });
+  flyTo(node, 1100);
+  clearTimeout(openViewTimer);
+  openViewTimer = setTimeout(() => { if (selected === node) showNoteView(node); }, 750);
 }
-async function closeNote() {
+function closeNote() {
   const n = selected;
   if (!n) return;
   selected = null;
   track("note_close", { id: n.id, seconds: Math.round((performance.now() - n.__openedAt) / 1000) });
-  if (imageLook()) { clearTimeout(openViewTimer); hideNoteView(); controls.autoRotate = CONFIG.DRIFT_SPEED > 0; return; }
-  await tween(600, e => {
-    n.__crumple.setProgress(e);
-    n.__group.scale.setScalar(CONFIG.OPEN_SCALE - e * (CONFIG.OPEN_SCALE - 1));
-  });
-  await paperToDot(n, 400);
+  clearTimeout(openViewTimer);
+  hideNoteView();
+  controls.autoRotate = CONFIG.DRIFT_SPEED > 0;
 }
 graph.onNodeClick(openNote);
 graph.onBackgroundClick(closeNote);
 
-// ---- opening animation: balls pop out of the middle into their groups ----
+// ---- opening animation: notes pop in ----
 function intro() {
   introPending = false;
   fitCamera(2600);
@@ -577,163 +321,13 @@ async function start() {
 start();
 
 // ============================================================
-//  SIDEBAR: write / photo
-// ============================================================
-function setMode(m) {
-  mode = m;
-  $("tabWrite").classList.toggle("active", m === "write");
-  $("tabPhoto").classList.toggle("active", m === "photo");
-  $("photoBox").hidden = m !== "photo";
-  $("wishInput").placeholder = m === "photo"
-    ? "your note's text will appear here" : "finish the sentence";
-}
-$("tabWrite").addEventListener("click", () => setMode("write"));
-$("tabPhoto").addEventListener("click", () => setMode("photo"));
-
-// ---- photo chosen ----
-$("photoInput").addEventListener("change", async e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  setStatus("Preparing photo…");
-  // Redrawing the photo on a canvas removes hidden data (like GPS location).
-  const bmp = await createImageBitmap(file);
-  const big = toCanvas(bmp, 1400);                      // for reading the text
-  const thumb = squareThumb(bmp, 320);                  // for the map
-  photo = { thumb: thumb.toDataURL("image/jpeg", 0.7) };
-  $("photoPreview").src = photo.thumb;
-  $("photoPreview").hidden = false;
-
-  if (!serverOn) {
-    setStatus("Demo mode: type what your note says, then Send.");
-    $("wishInput").focus();
-    return;
-  }
-  setStatus("Reading your handwriting…");
-  try {
-    const b64 = big.toDataURL("image/jpeg", 0.85).split(",")[1];
-    const res = await post({ action: "ocr", image: b64 });
-    $("wishInput").value = cleanOcr(res.text || "");
-    setStatus("Is this what you wrote? Fix anything the AI misread, then Send.");
-  } catch (err) {
-    console.error(err);
-    setStatus("Couldn't read the photo. Type what it says instead.");
-  }
-});
-
-function toCanvas(bmp, max) {
-  const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
-  const c = document.createElement("canvas");
-  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-  c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
-  return c;
-}
-function squareThumb(bmp, size) {
-  const s = Math.min(bmp.width, bmp.height);
-  const c = document.createElement("canvas");
-  c.width = c.height = size;
-  c.getContext("2d").drawImage(bmp, (bmp.width - s) / 2, (bmp.height - s) / 2, s, s, 0, 0, size, size);
-  return c;
-}
-function cleanOcr(t) {
-  return t.replace(/\s+/g, " ").replace(/^\s*i\s*wish\s*i\s*could\s*/i, "").trim();
-}
-
-// ---- color + public/private ----
-$("colorPicker").addEventListener("click", () => {
-  chosenColor = noteColors[(noteColors.indexOf(chosenColor) + 1) % noteColors.length];
-  $("colorPicker").style.background = chosenColor;
-  $("writeBox").style.background = chosenColor;
-});
-$("PublicMode").addEventListener("click", () => {
-  allowReplies = true;
-  $("PublicMode").classList.add("selected"); $("PrivateMode").classList.remove("selected");
-});
-$("PrivateMode").addEventListener("click", () => {
-  allowReplies = false;
-  $("PrivateMode").classList.add("selected"); $("PublicMode").classList.remove("selected");
-});
-
-// ---- SEND ----
-$("sendButton").addEventListener("click", async () => {
-  const text = $("wishInput").value.trim();
-  if (text === "") { setStatus(mode === "photo" ? "Add a photo first, or type your wish." : ""); return; }
-  const full = "I wish I could " + text;
-
-  // 1. safety check
-  const check = checkNote(full);
-  if (check === "self-harm") { showSupport(); saveToServer(full, "self-harm"); return; }
-  if (check !== "ok") {
-    saveToServer(full, check);
-    resetForm();
-    setStatus("Thanks. Your note will be reviewed before it appears. (Please leave out names, numbers and links.)");
-    return;
-  }
-
-  // 2. save (waits for review on the server)
-  saveToServer(full, "ok");
-
-  // 3. show it on YOUR map right away, marked pending
-  const node = {
-    id: "n" + Date.now(), text: full, color: chosenColor,
-    image: mode === "photo" && photo ? photo.thumb : null,
-    allowReplies, pending: true, group: -1, fx: 0, fy: 0, fz: 0
-  };
-  resetForm();
-  setStatus("Your wish is on its way. It appears for others after review.");
-  notes.push(node);
-  graph.graphData({ nodes: notes, links: [] });
-  try {
-    node.vec = (await embed([full]))[0];
-    regroup();
-  } catch (e) { console.error(e); }
-  return node;
-});
-
-function saveToServer(text, flag) {
-  if (!serverOn) return;
-  post({
-    action: "submit", text, flag, allowReplies, color: chosenColor,
-    image: mode === "photo" && photo ? photo.thumb : ""
-  }).catch(e => console.error("Save failed", e));
-}
-
-async function post(body) {
-  // text/plain avoids the browser's extra "preflight" request that Apps Script can't answer
-  const res = await fetch(CONFIG.SERVER_URL, { method: "POST", body: JSON.stringify(body) });
-  return res.json();
-}
-
-function resetForm() {
-  $("wishInput").value = "";
-  photo = null;
-  $("photoPreview").hidden = true;
-  $("photoInput").value = "";
-}
-function setStatus(t) { $("status").textContent = t; }
-
-// ---- support message (self-harm) ----
-function showSupport() {
-  resetForm();
-  setStatus("");
-  $("composer").hidden = true;
-  $("support").hidden = false;
-}
-$("supportBack").addEventListener("click", () => {
-  $("support").hidden = true;
-  $("composer").hidden = false;
-});
-
-if (!serverOn) $("modeNote").hidden = false;
-
-// ============================================================
 //  NAVIGATION + "ADD YOURS" (phone handoff with a QR code)
-//  Desktop shows a QR → phone opens the upload page (served by
-//  your Apps Script) → phone sends the photo → desktop sees it.
+//  Desktop shows a QR → phone opens phone.html → phone sends the
+//  photo → desktop sees it and the note flies onto the map.
 // ============================================================
 
 let pollTimer = null;
 let closeLive = null;          // closes the live (Firebase) room
-let lastNote = null;
 
 function openPage(id) {
   closeAll();
@@ -762,9 +356,8 @@ $("navAdd").addEventListener("click", () => {
   openPage("addPage");
   track("add_open", { phone: isPhone });
   if (!isPhone) loadModel().catch(() => {});        // get the AI ready before the note arrives
-  $("qr").hidden = false; $("addDone").hidden = true;
+  $("qr").hidden = false;
   $("qrCaption").hidden = false;
-  $("liveStep").hidden = true;
   startHandoff();
 });
 $("navAbout").addEventListener("click", () => { openPage("aboutPage"); track("about_open"); });
@@ -773,7 +366,6 @@ if (optedOut()) $("optOut").outerHTML = "<span>Your visits aren’t counted.</sp
 $("navContact").addEventListener("click", () => { openPage("contactPage"); track("contact_open"); });
 document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeAll));
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeAll(); });
-$("seeNote").addEventListener("click", () => { closeAll(); if (lastNote) setTimeout(() => flyTo(lastNote), 400); });
 
 async function startHandoff() {
   if (isPhone) {                                     // on a phone: no QR, go straight to the camera
@@ -808,7 +400,7 @@ async function startHandoff() {
     if (data.flag && data.flag !== "ok") { pillMessage("Thank you. Your note will be reviewed before it appears."); return; }
     $("handoffPill").hidden = true;
     hidePages();
-    lastNote = await arrive(data);              // back to the map: the note flies in
+    arrive(data);                               // back to the map: the note flies in
   }
 
   // 1. LIVE (Firebase): instant, with "Phone connected" → "on the way" → arrival
@@ -841,14 +433,6 @@ function pillMessage(t) {
   $("handoffPill").querySelector(".pulse").hidden = true;
   setTimeout(() => { $("handoffPill").hidden = true; $("handoffPill").querySelector(".pulse").hidden = false; }, 6000);
 }
-// laptop: replace the QR with what's happening on the phone
-function showStep(title, sub) {
-  $("qr").hidden = true;
-  $("qrCaption").hidden = true;
-  $("liveStep").hidden = false;
-  $("liveTitle").textContent = title;
-  $("liveSub").textContent = sub;
-}
 
 // came from the phone page ("See where it landed")? show that person's note
 async function showMyNote() {
@@ -861,8 +445,8 @@ async function showMyNote() {
 }
 
 // ============================================================
-//  ARRIVAL: a new note flies in from the bottom, you see it for a
-//  second, then it zooms out, crumples into a ball and joins its group.
+//  ARRIVAL: a new note flies in from the bottom, big, you see it for a
+//  moment, then the camera zooms out while it shrinks to its place.
 // ============================================================
 async function arrive(data) {
   closeAll();                                   // leave the "Add a note" page
@@ -903,15 +487,11 @@ async function arrive(data) {
   // 3. a second to read it
   await wait(CONFIG.ARRIVE_HOLD);
 
-  // 4. zoom out while it crumples into a ball
+  // 4. zoom out while it shrinks to its normal size
   graph.cameraPosition(T.clone().addScaledVector(out, D * 2.6), T, 1400);
-  await tween(1400, e => {
-    node.__crumple.setProgress(e);
-    node.__group.scale.setScalar(CONFIG.ARRIVE_SCALE + (1.2 - CONFIG.ARRIVE_SCALE) * e);
-  });
+  await tween(1400, e => node.__group.scale.setScalar(CONFIG.ARRIVE_SCALE + (1 - CONFIG.ARRIVE_SCALE) * e));
   node.__arriving = false;
   node.__pos = null;
-  await paperToDot(node, 600);
 
   // 5. step back to see the whole map
   await wait(500);

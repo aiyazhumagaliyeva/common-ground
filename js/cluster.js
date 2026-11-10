@@ -5,14 +5,14 @@
 //     wishes are not sent to any AI company for this step.
 //  2. All notes are grouped AT ONCE (not one by one), so the order
 //     notes arrived in does not matter. No first-mover advantage.
-//  3. Groups smaller than MIN_GROUP_SIZE stay in the middle cloud.
-//  4. The middle = the average of ALL notes. Groups sit around it,
-//     farther away the more different they are from the average.
+//  3. Groups smaller than MIN_GROUP_SIZE don't count as a group.
+//  4. Like TensorFlow's Embedding Projector, every note sits where its own
+//     meaning puts it (PCA = the 3 main directions of the data);
+//     GROUP_PULL gently pulls notes of the same group together.
 // ============================================================
 
 import { CONFIG } from './config.js';
 import { SEED_VECTORS } from './seed-vectors.js';
-import { LABEL_VECTORS } from './label-vectors.js';
 
 // The AI library loads only when needed, so the map still shows if it fails.
 let extractor = null;
@@ -56,11 +56,9 @@ function remember(text, v) {
 }
 export function knownVector(text) {
   if (SEED_VECTORS[text]) return decode(SEED_VECTORS[text]);
-  if (LABEL_VECTORS[text]) return decode(LABEL_VECTORS[text]);
   try { const s = localStorage.getItem("cg:vec:" + text); if (s) return decode(s); } catch (e) {}
   return null;
 }
-export const modelReady = () => !!extractor;
 
 // ---------- small vector helpers ----------
 const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
@@ -145,77 +143,24 @@ export function layout(notes) {
   const all = groupAll(E);
   const groups = all.filter(g => g.length >= CONFIG.MIN_GROUP_SIZE)
                     .sort((a, b) => b.length - a.length);
-  const inGroup = new Set(groups.flat());
+  notes.forEach(n => (n.group = -1));                  // -1 = not in a group
+  groups.forEach((g, gi) => g.forEach(i => (notes[i].group = gi)));
 
-  // --- middle cloud: notes not (yet) in a group ---
-  const middle = notes.map((_, i) => i).filter(i => !inGroup.has(i));
-  middle.forEach(i => {
-    const p = project(centered[i], pcs);
-    const r = CONFIG.MIDDLE_RADIUS * (0.35 + 0.65 * Math.min(1, len3(p) / 0.6));
-    const L = len3(p);
-    const n = notes[i];
-    n.group = -1;
-    n.tx = (p[0] / L) * r + hash(n.id, 1) * 18;
-    n.ty = (p[1] / L) * r + hash(n.id, 2) * 18;
-    n.tz = (p[2] / L) * r + hash(n.id, 3) * 18;
-  });
-
-  // --- group centers: direction from PCA, distance from "how unusual" ---
-  const centers = groups.map(g => {
-    const c = mean(g.map(i => E[i]));
-    const p = project(sub(c, M), pcs);
-    const L = len3(p);
-    const unusual = 1 - dot(c, M) / (norm(c) * norm(M));      // 0 = average
-    const dist = CONFIG.GROUP_DISTANCE * (0.75 + unusual);
-    return [(p[0] / L) * dist, (p[1] / L) * dist, (p[2] / L) * dist];
-  });
-  // push groups apart so they never overlap
-  for (let it = 0; it < 80; it++) {
-    for (let a = 0; a < centers.length; a++) {
-      for (let b = a + 1; b < centers.length; b++) {
-        const d = sub(centers[a], centers[b]), L = len3(d);
-        if (L < CONFIG.GROUP_SPACING) {
-          const push = scale(d, (CONFIG.GROUP_SPACING - L) / (2 * L));
-          centers[a] = centers[a].map((v, i) => v + push[i]);
-          centers[b] = centers[b].map((v, i) => v - push[i]);
-        }
-      }
-      const L = len3(centers[a]), minR = CONFIG.MIDDLE_RADIUS + 70;
-      if (L < minR) centers[a] = scale(centers[a], minR / L);
-    }
-  }
-
-  // --- notes inside a group: spread by their own differences ---
-  groups.forEach((g, gi) => {
-    const gc = mean(g.map(i => E[i]));
-    g.forEach(i => {
-      const p = project(sub(E[i], gc), pcs);
-      const n = notes[i];
-      n.group = gi;
-      const s = CONFIG.GROUP_SPREAD * 3;
-      n.tx = centers[gi][0] + p[0] * s + hash(n.id, 1) * CONFIG.GROUP_SPREAD;
-      n.ty = centers[gi][1] + p[1] * s + hash(n.id, 2) * CONFIG.GROUP_SPREAD;
-      n.tz = centers[gi][2] + p[2] * s + hash(n.id, 3) * CONFIG.GROUP_SPREAD;
-    });
-  });
-
-  // --- "projector" layout: one continuous cloud like TensorFlow ---
+  // --- one continuous cloud, like TensorFlow ---
   // Every note sits where its own meaning puts it (PCA), not on a group island.
   // GROUP_PULL gently pulls notes of the same group toward each other (0 = pure PCA).
-  if (CONFIG.LAYOUT_STYLE === "projector") {
-    const P = centered.map(v => project(v, pcs));
-    const radii = P.map(len3).sort((a, b) => a - b);
-    const R = radii[Math.floor(radii.length * 0.9)] || 1;      // ignore the few extreme notes
-    const k = CONFIG.MAP_RADIUS / R;
-    const gMean = groups.map(g => [0, 1, 2].map(d => g.reduce((t, i) => t + P[i][d], 0) / g.length));
-    notes.forEach((n, i) => {
-      let q = P[i];
-      if (n.group >= 0 && CONFIG.GROUP_PULL) q = q.map((v, d) => v + (gMean[n.group][d] - v) * CONFIG.GROUP_PULL);
-      n.tx = q[0] * k + hash(n.id, 1) * CONFIG.NOTE_SIZE * 0.6;
-      n.ty = q[1] * k + hash(n.id, 2) * CONFIG.NOTE_SIZE * 0.6;
-      n.tz = q[2] * k + hash(n.id, 3) * CONFIG.NOTE_SIZE * 0.6;
-    });
-  }
+  const P = centered.map(v => project(v, pcs));
+  const radii = P.map(len3).sort((a, b) => a - b);
+  const R = radii[Math.floor(radii.length * 0.9)] || 1;      // ignore the few extreme notes
+  const k = CONFIG.MAP_RADIUS / R;
+  const gMean = groups.map(g => [0, 1, 2].map(d => g.reduce((t, i) => t + P[i][d], 0) / g.length));
+  notes.forEach((n, i) => {
+    let q = P[i];
+    if (n.group >= 0 && CONFIG.GROUP_PULL) q = q.map((v, d) => v + (gMean[n.group][d] - v) * CONFIG.GROUP_PULL);
+    n.tx = q[0] * k + hash(n.id, 1) * CONFIG.NOTE_SIZE * 0.6;
+    n.ty = q[1] * k + hash(n.id, 2) * CONFIG.NOTE_SIZE * 0.6;
+    n.tz = q[2] * k + hash(n.id, 3) * CONFIG.NOTE_SIZE * 0.6;
+  });
 
   // --- keep notes from sitting inside each other (groups stay together) ---
   const minD = CONFIG.NOTE_SIZE * (CONFIG.NOTE_GAP || 0);

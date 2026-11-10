@@ -21,11 +21,6 @@ export const QR_STYLE = {
   bracketWidth: 0.55,    // line thickness of brackets
 };
 
-// how many modules across the code will be (fewer = bigger, calmer dots)
-export function qrSize(text, ecc = QR_STYLE.ecc) {
-  return QRCode.create(text, { errorCorrectionLevel: ecc }).modules.size;
-}
-
 export function drawQR(container, text, style = {}) {
   const s = { ...QR_STYLE, ...style };
   const qr = QRCode.create(text, { errorCorrectionLevel: s.ecc });

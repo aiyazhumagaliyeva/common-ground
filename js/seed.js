@@ -2,7 +2,7 @@
 //  STARTING NOTES — scanned handwritten notes (Nov 5)
 //  file:  notes/<file>.jpg
 //  text:  what the note says, transcribed as written
-//  paper: the paper color (the dot on the map uses it)
+//  paper: the paper color (measured from the scan; not used right now)
 //  allowReplies: false = "just sharing"
 //  One note was held back (self-harm) and is not on the map.
 //  Vectors (meaning) for these notes are pre-computed in
@@ -95,4 +95,3 @@ export const photoNotes = [
   { file: "less-awkward",   paper: "#ddc89f", text: "I wish I could be less awkward when I first meet people" },
 ];
 
-export const typedNotes = [];   // fictional notes removed — only real notes now

@@ -64,15 +64,6 @@ function doGet(e) {
     return json({ ok: true });
   }
 
-  // the phone page (opened from the QR code)
-  if (p.page === "upload") {
-    const t = HtmlService.createTemplateFromFile("Upload");
-    t.session = String(p.s || "").replace(/[^a-z0-9]/gi, "").slice(0, 20);
-    return t.evaluate()
-      .setTitle("Common Ground — add yours")
-      .addMetaTag("viewport", "width=device-width, initial-scale=1");
-  }
-
   // the website asks for approved notes
   if (p.action === "approved") {
     const rows = getSheet().getDataRange().getValues().slice(1);
