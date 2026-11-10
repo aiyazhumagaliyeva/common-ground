@@ -185,5 +185,112 @@ function notifyMe(text) {
   );
 }
 
+// ---------- "responses" tab: see every response next to the note it answers ----------
+// Read-only view. To approve or reject a response, change its status in the "notes" tab.
+// Starting notes (the scanned ones) live in the website, so their text is copied here for the lookup.
+const STARTING_NOTES = [
+  ["top-surgery", "I wish I could get top surgery"],
+  ["hands", "I wish I could spend more time making things with my hands"],
+  ["friends-time", "I wish I could have all the time in the world to spend with my friends"],
+  ["leaked-video", "I wish I could watch a leaked video of my favorite band member without getting cancelled on twitter"],
+  ["live-happily", "I wish I could live more happily"],
+  ["pull-through", "I wish I could pull through all of that bs"],
+  ["paid-job", "I wish I could find a paid job"],
+  ["date", "I wish I could date a girlboy thing"],
+  ["be-white", "I wish I could be white..."],
+  ["confident", "I wish I could be more confident"],
+  ["get-a-job", "I wish I could get a job"],
+  ["belong", "I wish I could feel like I belong"],
+  ["procrastinate", "I wish I could stop procrastinate and actually start working on things I said I'll do."],
+  ["speaker", "I wish I could be a speaker who with more confidence."],
+  ["earn", "I wish I could earn 500k $ a year."],
+  ["read-minds", "I wish I could read people's mind"],
+  ["creative-career", "I wish I could pursue a creative / artistic career without the fear of ending up homeless / not accepted / failing"],
+  ["worry-less", "I wish I could worry less and do more"],
+  ["get-job-lol", "I wish I could get a job lol"],
+  ["sleep", "I wish I could go to sleep"],
+  ["my-life", "I wish I could just know what I'm doing with my life"],
+  ["fly", "I wish I could fly"],
+  ["know-answer", "I wish I could know the answer to any question of mine"],
+  ["passionate", "I wish I could find what I am really passionate about and be motivated."],
+  ["more-time", "I wish I could have more time..."],
+  ["billionaire", "I want to become a billionaire and buy my own island."],
+  ["impact", "I wish I could make a long lasting impact on my community & beyond."],
+  ["alaska", "I wish I could go to Alaska this December."],
+  ["gender", "I wish I could change gender inequality in the workplace."],
+  ["intention", "I wish I could know the intention behind every action. (social & emotional)"],
+  ["whatever", "I wish I could do whatever I don't wish to do."],
+  ["grow-up-us", "I wish I could grow up in the US as my parents originally planned."],
+  ["forever", "I wish I could live forever."],
+  ["be-a-plant", "I wish I could be a plant"],
+  ["travel-world", "I wish I could travel around the world!!"],
+  ["achieve-goals", "I wish I could had the ability to achieve my goals and help others."],
+  ["five-languages", "I wish I could speak 5 languages fluently"],
+  ["job-america", "I wish I could get a job in America and get H1B."],
+  ["quit-nicotine", "I wish I could quit nicotine"],
+  ["better-person", "I wish I could be a better person"],
+  ["leave-friendships", "I wish I could leave some friendships behind"],
+  ["rich-already", "I wish I could be rich already"],
+  ["more-sleep", "I wish I could get more than 4 hours of sleep on a regular basis. :)"],
+  ["broccoli", "I wish I could eat broccoli!"],
+  ["happy-everyday", "I wish I could happy everyday :)"],
+  ["nepo-baby", "I wish I could be born as a nepo baby in another life"],
+  ["hug-mom", "I wish I could hug my mom whenever I want to."],
+  ["better-health", "I wish I could have better health."],
+  ["go-back-home", "I wish I could go back home"],
+  ["say-no", "I wish I could learn how to say no to people & to myself."],
+  ["dance-well", "I wish I could dance well."],
+  ["clearer-skin", "I wish I could have clearer skin"],
+  ["chatgpt-laundry", "I wish I could get ChatGPT to do my laundry"],
+  ["glimpse-future", "I wish I could get a glimpse of my future and either feel re-assured or know what to change now"],
+  ["keep-to-myself", "I wish I could keep some things to myself instead of telling others what's on my mind all the time"],
+  ["work-apple", "I wish I could work in Apple"],
+  ["without-worry", "I wish I could get where I want to without worry"],
+  ["money-worry", "I wish I could not worry about money"],
+  ["do-better-1", "I wish I could do better"],
+  ["astronaut", "I wish I could become an astronaut"],
+  ["hard-things", "I wish I could talk about hard things without crying so easily"],
+  ["economy", "I wish I could make the economy of my country & my family's business better."],
+  ["financial", "I wish I could live life as I wish without worrying about financial difficulties"],
+  ["share-family", "I wish I could share more with my family"],
+  ["know-everything", "I wish I could just like know everything there is"],
+  ["what-to-make", "I wish I could know what to make"],
+  ["good-job", "I wish I could know who to talk to to get a good job bro"],
+  ["what-to-talk", "I wish I could know what to talk about"],
+  ["see-mom", "I wish I could see my mom at least once a month"],
+  ["brothers", "I wish I could go back in time and be very nice and spend all the time I could with my brothers while we still lived in the same home. I miss them so much."],
+  ["be-okay", "I wish I could be sure that everything will be okay"],
+  ["thesis", "I wish I could have my thesis speak to me so we can figure it out together"],
+  ["do-better-2", "I wish I could do better"],
+  ["siblings", "I wish I could be there for my siblings"],
+  ["slow-time", "I wish I could slow down the time..."],
+  ["see-family", "I wish I could see my family more than twice a year"],
+  ["debtless", "I wish I could be debtless"],
+  ["opinions", "I wish I could stop worrying about other people's opinions"],
+  ["screening", "I wish I could find an easy way of screening people before I invest too much into a relationship with them"],
+  ["future-holds", "I wish I could understand what the future holds"],
+  ["less-awkward", "I wish I could be less awkward when I first meet people"]
+];
+function getResponsesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let ids = ss.getSheetByName("note ids");
+  if (!ids) ids = ss.insertSheet("note ids");
+  ids.clear();
+  ids.getRange(1, 1, 1, 2).setValues([["note id", "note text"]]);
+  ids.getRange(2, 1, STARTING_NOTES.length, 2).setValues(STARTING_NOTES);
+  ids.hideSheet();
+  let sh = ss.getSheetByName("responses");
+  if (!sh) sh = ss.insertSheet("responses");
+  sh.clear();
+  // B:F = every row of "notes" that is a response, newest first
+  sh.getRange("B1").setFormula("=QUERY(notes!A:K, \"select E, C, B, D, K where K <> '' order by B desc label E 'response', C 'status', B 'sent', D 'flag', K 'note id'\", 1)");
+  // A = the text of the note it answers (starting note, or a note from the notes tab)
+  sh.getRange("A1").setFormula("={\"replying to\"; ARRAYFORMULA(IF(F2:F = \"\", , IFERROR(VLOOKUP(F2:F, 'note ids'!A:B, 2, FALSE), IFERROR(VLOOKUP(REGEXREPLACE(F2:F, \"^s\", \"\"), notes!A:E, 5, FALSE), F2:F))))}");
+  sh.setFrozenRows(1);
+  sh.setColumnWidth(1, 360); sh.setColumnWidth(2, 360);
+  sh.getRange("A1:F1").setFontWeight("bold");
+  return sh;
+}
+
 // Run once from the editor (select "setup" → Run).
-function setup() { getSheet(); getEventsSheet(); }
+function setup() { getSheet(); getEventsSheet(); getResponsesSheet(); }

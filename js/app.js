@@ -975,16 +975,16 @@ function nextTourStep() {
   if (st.id === "rotate" && touch) { controls.autoRotate = true; controls.autoRotateSpeed = 3; }
   // open step: after the click, the note under the cursor opens
   // respond step: a note is open, the cursor clicks "get a response QR code"
-  $("tour").classList.toggle("clear", !!(st.opensNote || st.respond));   // the note view already greys the map
+  $("tour").classList.toggle("clear", !!(st.respond && viewNote));   // the note view already greys the map (no white flash)
   if (st.respond) {
-    if (!viewNote) { const n = noteNear([688, 544]) || notes.find(x => x.allowReplies && x.__group); if (n) { tourNote = n; openNote(n); } }
+    if (!viewNote) { const n = noteNear([688, 544]) || notes.find(x => x.allowReplies && x.__group); if (n) { tourNote = n; openNote(n); $("tour").classList.add("clear"); } }
     else tourNote = selected;
     tourTimer = setTimeout(() => { if (TOUR[tourStep] === st && viewNote) startRespond(); }, 2600 * 0.62);
   }
   if (st.opensNote) {
     tourTimer = setTimeout(() => {
       const n = noteNear(st.from);
-      if (n && tourStep === TOUR.indexOf(st)) { tourNote = n; openNote(n); }
+      if (n && tourStep === TOUR.indexOf(st)) { tourNote = n; openNote(n); $("tour").classList.add("clear"); }
     }, 2600 * 0.62);
   }
 }

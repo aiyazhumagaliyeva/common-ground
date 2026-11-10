@@ -65,6 +65,7 @@ const enabled = () => CONFIG.TRACKING && !optedOut() && CONFIG.SERVER_URL;
 let queue = [];
 export function track(event, detail = {}) {
   if (!enabled()) return;
+  if (window.clarity) try { window.clarity("event", event); } catch (e) {}   // filter heatmaps/recordings by event in Clarity
   queue.push({
     t: new Date().toISOString(), visitor, visit, event, src, device,
     page: location.pathname.split("/").pop() || "index.html",

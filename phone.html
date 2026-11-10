@@ -240,6 +240,9 @@
       $("text").placeholder = "what your response says";
       $("text").setAttribute("aria-label", "What your response says");
       document.querySelector(".withScreen").textContent = "Look at the screen. Your response is landing next to the note.";
+      document.querySelector("#noCamera h1").textContent = "Add your response";
+      document.querySelector("#noCamera p").textContent = "Take a photo of your response, or choose one from your photos. Fit the whole note in the picture, with as little background as possible.";
+      $("still").alt = $("sentPhoto").alt = "Your response";
     }
     startTracking("phone");
     track("phone_open", { withScreen: !!SESSION });
