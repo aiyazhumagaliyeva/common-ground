@@ -110,6 +110,7 @@
       left: calc(14 * var(--k)); top: calc(511 * var(--k));
       width: calc(365 * var(--k)); height: calc(60 * var(--k));
       border-radius: 50px; background: rgba(220, 220, 220, 0.5);
+      transform: translateZ(0); isolation: isolate; overflow: hidden;
     }
     body.reviewing #toggle { display: flex; align-items: center; }
     #toggle .thumb {
@@ -247,6 +248,7 @@
     startTracking("phone");
     track("phone_open", { withScreen: !!SESSION });
     tell(SESSION, { step: "connected" });                     // the big screen shows "Phone connected"
+    if (SESSION) fetch(CONFIG.SERVER_URL + "?action=connect&s=" + SESSION).catch(() => {});   // same, without Firebase
     let ocrText = "", how = "camera";
     let thumb = "", allowReplies = true, stream = null;
 

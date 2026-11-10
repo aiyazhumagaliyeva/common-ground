@@ -739,10 +739,20 @@ function openPage(id) {
   $(id).classList.add("open");
 }
 function closeAll() {
-  document.body.classList.remove("page-open");
-  document.querySelectorAll(".page").forEach(p => p.classList.remove("open"));
+  hidePages();
   clearInterval(pollTimer);
   if (closeLive) { closeLive(); closeLive = null; }
+  $("handoffPill").hidden = true;
+}
+function hidePages() {
+  document.body.classList.remove("page-open");
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("open"));
+}
+// the phone scanned the QR: close the add page, keep waiting for the note in the background
+function phoneConnected(title) {
+  $("handoffText").textContent = title;
+  $("handoffPill").hidden = false;
+  if ($("addPage").classList.contains("open")) { hidePages(); track("add_autoclose"); }
 }
 
 const isPhone = matchMedia("(pointer: coarse)").matches && innerWidth < 900;
@@ -792,8 +802,10 @@ async function startHandoff() {
     clearInterval(pollTimer);
     if (closeLive) { closeLive(); closeLive = null; }
     track("note_arrived", { flag: data.flag, live: liveOn() });
-    if (data.flag === "self-harm") { showStep("Thank you.", "This note won’t be posted. Please check your phone."); return; }
-    if (data.flag && data.flag !== "ok") { showStep("Thank you.", "Your note will be reviewed before it appears."); return; }
+    if (data.flag === "self-harm") { pillMessage("Thank you. This note won’t be posted. Please check your phone."); return; }
+    if (data.flag && data.flag !== "ok") { pillMessage("Thank you. Your note will be reviewed before it appears."); return; }
+    $("handoffPill").hidden = true;
+    hidePages();
     lastNote = await arrive(data);              // back to the map: the note flies in
   }
 
@@ -801,8 +813,8 @@ async function startHandoff() {
   if (liveOn()) {
     try {
       closeLive = await listen(session, room => {
-        if (room.step === "connected") showStep("Phone connected", "Take a photo of your note");
-        if (room.step === "photo") showStep("Your note is on the way…", "Check the text on your phone, then submit");
+        if (room.step === "connected") phoneConnected("Phone connected. Your note will land here.");
+        if (room.step === "photo") phoneConnected("Your note is on the way…");
         if (room.step === "sent" && room.note) receive(room.note);
       });
     } catch (e) { console.warn("live connection failed, using the slower check", e); }
@@ -817,10 +829,16 @@ async function startHandoff() {
       const res = await fetch(CONFIG.SERVER_URL + "?action=session&s=" + session);
       const data = await res.json();
       if (data.status === "received") receive(data);
+      else if (data.status === "connected" && $("handoffPill").hidden) phoneConnected("Phone connected. Your note will land here.");
     } catch (e) { console.warn("poll failed", e); }
   }, liveOn() ? 4000 : 1500);
 }
 
+function pillMessage(t) {
+  $("handoffText").textContent = t; $("handoffPill").hidden = false;
+  $("handoffPill").querySelector(".pulse").hidden = true;
+  setTimeout(() => { $("handoffPill").hidden = true; $("handoffPill").querySelector(".pulse").hidden = false; }, 6000);
+}
 // laptop: replace the QR with what's happening on the phone
 function showStep(title, sub) {
   $("qr").hidden = true;
@@ -927,6 +945,9 @@ let tourStep = -1, tourNote = null, tourTimer = null;
 function startTour() {
   if (document.body.classList.contains("page-open")) closeAll();
   tourStep = -1;
+  const narrow = matchMedia("(max-width: 700px)").matches;
+  (narrow ? $("tour") : $("tourStage")).appendChild($("tourCopy"));
+  $("tourCopy").classList.toggle("phone", narrow);
   $("tour").hidden = false;
   document.body.classList.add("touring");
   track("tour_start");
@@ -971,7 +992,7 @@ function nextTourStep() {
   const at = (el, x, y) => { el.style.left = `calc(${x} * var(--k))`; el.style.top = `calc(${y} * var(--k))`; };
   $("tourText").textContent = st.text;
   $("tourHint").textContent = `${touch ? "Tap" : "Click"} anywhere to continue · ${tourStep + 1} of ${TOUR.length}`;
-  at($("tourCopy"), st.textAt[0], st.textAt[1]);
+  if (!$("tourCopy").classList.contains("phone")) at($("tourCopy"), st.textAt[0], st.textAt[1]);
   // drawing (zoom step)
   img.hidden = !st.image;
   if (st.image) {                                  // drawing sits under the text, so they never overlap
@@ -1003,7 +1024,7 @@ function nextTourStep() {
   if (st.respond) {
     if (!viewNote) { const n = noteNear([688, 544]) || notes.find(x => x.allowReplies && x.__group); if (n) { tourNote = n; openNote(n); } }
     else tourNote = selected;
-    tourTimer = setTimeout(() => { if (TOUR[tourStep] === st && viewNote) startRespond(); }, 2600 * 0.62 + (viewNote ? 0 : 800));
+    tourTimer = setTimeout(() => { if (TOUR[tourStep] === st && viewNote && !phoneView()) startRespond(); }, 2600 * 0.62 + (viewNote ? 0 : 800));
   }
   if (st.opensNote) {
     tourTimer = setTimeout(() => {
@@ -1083,6 +1104,7 @@ function showNoteView(n) {
   $("nvImg").src = n.image || "";
   $("nvImg").alt = n.text;
   $("nvBar").hidden = !n.allowReplies;
+  $("nvRespond").textContent = isPhone ? "Tap here to respond" : "Click here to get a response QR code";
   $("nvCard").hidden = true;
   v.classList.remove("responding");
   drawResponses(n);
@@ -1094,6 +1116,8 @@ function hideNoteView() {
   $("noteView").hidden = true;
   viewNote = null;
 }
+const PHONE_SLOTS = [[50, 52], [-8, 56], [56, -10], [-10, -8], [22, 62], [60, 22], [-12, 24], [24, -14], [36, 40]];
+const phoneView = () => matchMedia("(max-width: 700px)").matches;
 function drawResponses(n, animateLast = false) {
   const box = $("nvResponses"), list = responsesFor[n.id] || [];
   box.innerHTML = "";
@@ -1101,8 +1125,14 @@ function drawResponses(n, animateLast = false) {
     const el = document.createElement(r.image ? "img" : "div");
     el.className = "nvResp" + (animateLast && i === list.length - 1 ? " landing" : "");
     if (r.image) { el.src = r.image; el.alt = r.text || "A response"; }
-    el.style.left = `calc(${RESPONSE_SLOTS[i][0]} * var(--k))`;
-    el.style.top = `calc(${RESPONSE_SLOTS[i][1]} * var(--k))`;
+    if (phoneView()) {
+      const [x, y] = PHONE_SLOTS[i % PHONE_SLOTS.length];
+      el.style.left = `calc(14vw + ${x}vw)`;
+      el.style.top = `calc(var(--nvTop) + ${y}vw)`;
+    } else {
+      el.style.left = `calc(${RESPONSE_SLOTS[i][0]} * var(--k))`;
+      el.style.top = `calc(${RESPONSE_SLOTS[i][1]} * var(--k))`;
+    }
     box.appendChild(el);
   });
 }
@@ -1111,6 +1141,11 @@ function drawResponses(n, animateLast = false) {
 async function startRespond() {
   if (!viewNote) return;
   const n = viewNote;
+  if (isPhone && $("tour").hidden) {
+    track("respond_open", { id: n.id, phone: true });
+    location.href = "phone.html?reply=" + encodeURIComponent(n.id) + (SOURCE !== "direct" ? "&src=" + encodeURIComponent(SOURCE) : "");
+    return;
+  }
   $("noteView").classList.add("responding");
   $("nvCard").hidden = false;
   track("respond_open", { id: n.id });

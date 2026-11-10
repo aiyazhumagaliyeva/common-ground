@@ -209,6 +209,8 @@
     #noteView.responding #nvImg { left: calc(126 * var(--k)); }
     #noteView.responding #nvResponses { opacity: 0; pointer-events: none; }
     #nvResponses { transition: opacity 0.3s ease; }
+    #nvImg { z-index: 1; }
+    .nvResp { z-index: 2; }   /* responses sit on top of the note */
     .nvResp { position: absolute; width: calc(176 * var(--k)); height: calc(175 * var(--k)); background: #fff; object-fit: cover;
       box-shadow: 0 calc(6 * var(--k)) calc(18 * var(--k)) rgba(0,0,0,0.2); }
     .nvResp.landing { animation: respLand 0.7s cubic-bezier(.2,.9,.3,1.2); }
@@ -233,7 +235,18 @@
       display: grid; place-items: center; box-sizing: border-box; }
     #nvCard .qrSlot { padding-left: calc(9 * var(--k)); }
     #nvQr { width: calc(131 * var(--k)); height: calc(131 * var(--k)); }
-    #tour.clear { background: transparent; }
+    #tour.clear { background: transparent; transition: background-color 0.3s ease 0.15s; }   /* fades as the note view fades in: no flash */
+    /* phones: the note fills the width, responses overlap its edges, text at the bottom */
+    @media (max-width: 700px) {
+      #nvStage { left: 0; top: 0; width: 100%; height: 100%; transform: none; --nvTop: calc(46dvh - 36vw); }
+      #nvImg, #noteView.responding #nvImg { left: 14vw; top: var(--nvTop); width: 72vw; height: 72vw; }
+      .nvResp { width: 26vw; height: 26vw; }
+      #nvBar { left: 16px; right: 16px; top: auto; bottom: 100px; justify-content: center; flex-wrap: wrap; gap: 6px 14px; font-size: 16px; white-space: normal; }
+      #nvRespond { text-decoration: underline; }
+    }
+    #tourCopy.phone { position: fixed; left: 24px; right: 24px; bottom: 170px; width: auto; z-index: 1; }
+    #tourCopy.phone #tourText { font-size: 18px; }
+    #tourCopy.phone #tourImage { max-width: 100%; }
 
     /* ---------- WALKTHROUGH (Figma: home-how-to-*): grey veil #262626 at 40%, white Helvetica 20 ---------- */
     #tour { position: fixed; inset: 0; z-index: 6; background: rgba(38, 38, 38, 0.4); cursor: pointer; animation: tourIn 0.35s ease-out; }
@@ -371,6 +384,12 @@
     body:has(#openCamera:not([hidden])) .qrCard .box { display: none; }
     #liveStep { display: flex; flex-direction: column; align-items: center; gap: calc(10 * var(--k)); font-size: max(14px, calc(18 * var(--k))); animation: stepIn .4s ease-out; }
     #liveStep[hidden] { display: none; }
+    /* after the QR is scanned the add page closes; this small pill says the note is coming */
+    #handoffPill { position: fixed; z-index: 5; left: 50%; bottom: max(24px, calc(44 * var(--k))); transform: translateX(-50%);
+      display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-radius: 50px; background: rgba(255,255,255,0.9);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.15); font: 15px Helvetica, Arial, sans-serif; color: #111; white-space: nowrap; animation: stepIn .4s ease-out; }
+    #handoffPill[hidden] { display: none; }
+    #handoffPill .pulse { width: 10px; height: 10px; border-radius: 50%; background: #111; animation: pulse 1.4s ease-in-out infinite; }
     #liveStep span:last-child { color: rgba(0,0,0,0.55); font-size: 0.8em; }
     #liveStep .pulse { width: calc(14 * var(--k)); height: calc(14 * var(--k)); border-radius: 50%; background: #111; animation: pulse 1.4s ease-in-out infinite; }
     @keyframes pulse { 50% { transform: scale(1.6); opacity: .35; } }
@@ -494,6 +513,8 @@
   </nav>
 
   <!-- ---------- ADD A NOTE ---------- -->
+  <div id="handoffPill" role="status" hidden><span class="pulse"></span><span id="handoffText">Phone connected. Your note will land here.</span></div>
+
   <section class="page" id="addPage" aria-label="Add a note">
     <button class="back" data-close aria-label="Back to the board"><img src="icons/back.svg" alt=""></button>
     <h1>How to contribute to Common Ground</h1>
@@ -580,6 +601,7 @@
           <li>Notes that could reveal personal information are never made public.</li>
           <li>Notes about self-harm are never posted. The writer is shown where to find support instead.</li>
           <li>Visits are counted anonymously for research: where people came from and what they click, with no names or exact location.</li>
+          <li>Visits are counted anonymously for research using Microsoft Clarity, which may use cookies. <a href="https://privacy.microsoft.com/privacystatement" target="_blank" rel="noopener">How Microsoft uses this data</a></li>
         </ul>
         <p class="privacy"><button type="button" id="optOut" class="linkBtn">Don’t count my visits</button></p>
       </div>

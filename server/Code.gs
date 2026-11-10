@@ -8,7 +8,7 @@
 //   5. saves anonymous visit events to the "events" tab (research)
 // ============================================================
 
-const VERSION = 5;   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
+const VERSION = 6;   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
 
 const SHEET_NAME = "notes";
 const HEADERS = ["id", "createdAt", "status", "flag", "text", "allowReplies", "color", "image", "session", "source", "replyTo"];
@@ -29,6 +29,7 @@ function getSheet() {
   if (sh.getRange(1, 9).getValue() !== "session") sh.getRange(1, 9).setValue("session");
   if (sh.getRange(1, 10).getValue() !== "source") sh.getRange(1, 10).setValue("source");
   if (sh.getRange(1, 11).getValue() !== "replyTo") sh.getRange(1, 11).setValue("replyTo");   // which note a response answers
+  if (!ss.getSheetByName("responses")) getResponsesSheet();   // made automatically, no need to run setup
   return sh;
 }
 
@@ -56,6 +57,13 @@ function doGet(e) {
 
   if (p.action === "version") return json({ version: VERSION });
 
+  // the phone opened the QR link → the big screen can close its QR page
+  if (p.action === "connect") {
+    const s = String(p.s || "").replace(/[^a-z0-9]/gi, "").slice(0, 20);
+    if (s) CacheService.getScriptCache().put("c_" + s, "1", 1800);
+    return json({ ok: true });
+  }
+
   // the phone page (opened from the QR code)
   if (p.page === "upload") {
     const t = HtmlService.createTemplateFromFile("Upload");
@@ -79,7 +87,7 @@ function doGet(e) {
     const s = String(p.s || "");
     const rows = getSheet().getDataRange().getValues().slice(1);
     const r = rows.reverse().find(row => s && row[8] === s);
-    if (!r) return json({ status: "waiting" });
+    if (!r) return json({ status: s && CacheService.getScriptCache().get("c_" + s) ? "connected" : "waiting" });
     return json({
       status: "received", flag: r[3], text: r[3] === "ok" ? r[4] : "",
       image: r[3] === "ok" ? r[7] : "", allowReplies: r[5] === true, replyTo: r[10] || ""
