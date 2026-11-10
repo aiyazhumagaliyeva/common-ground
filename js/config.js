@@ -74,7 +74,7 @@ export const CONFIG = {
   DOT_SIZE: 7,            // size of a dot on the map
   // ---- RESPONSES ----
   // PREVIEW ONLY: white placeholder responses on these notes, to judge the layout. Set to {} before launch.
-  RESPONSE_PREVIEW: { "speaker": 9, "belong": 2, "fly": 1, "travel-world": 1 },
+  RESPONSE_PREVIEW: {},
   TOUR_SHOW: "never",       // walkthrough shows by itself: "every-visit" (each new visit), "first-visit" (once per browser), "never" (only with ?)
   DRIFT_SPEED: 0.15,      // slow turning of the map until someone touches it (0 = off)
   FLOAT: 0.08,            // how much the balls bob up and down
