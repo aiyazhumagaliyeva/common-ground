@@ -66,7 +66,7 @@
     /* ---------- camera step ---------- */
     #shutter {
       all: unset; position: absolute; cursor: pointer;
-      left: calc(155 * var(--k)); top: calc(630 * var(--k));
+      left: calc(155 * var(--k)); top: calc(581 * var(--k));
       width: calc(84 * var(--k)); height: calc(84 * var(--k));
       border-radius: 50%; border: calc(3 * var(--k)) solid #fff; box-sizing: border-box;
       display: flex; align-items: center; justify-content: center;
@@ -77,15 +77,17 @@
     }
     #shutter:active::after { transform: scale(0.9); }
     #hint { display: none; }                              /* Figma: no hint text on the camera */
-    /* gallery icon (Figma: 60 × 56 at 23 / 543) */
-    #gallery { left: calc(23 * var(--k)); top: calc(531 * var(--k)); width: calc(60 * var(--k)); height: calc(56 * var(--k)); cursor: pointer; }
-    #gallery img { width: 100%; height: 100%; display: block; }
+    /* "or choose from your photos": one line under the shutter */
+    #gallery {
+      left: 0; right: 0; top: calc(682 * var(--k)); text-align: center;
+      font-size: calc(14 * var(--k)); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+    }
     /* zoom chip "1x" (Figma: 38 circle at 178 / 464, black 60%, gold 13px) */
-    #zoomChip { all: unset; position: absolute; cursor: pointer; left: calc(178 * var(--k)); top: calc(429 * var(--k));
+    #zoomChip { all: unset; position: absolute; cursor: pointer; touch-action: none; left: calc(178 * var(--k)); top: calc(429 * var(--k));
       width: calc(38 * var(--k)); height: calc(38 * var(--k)); border-radius: 50%; background: rgba(0,0,0,0.6);
       display: grid; place-items: center; color: #e9c94f; font-size: calc(13 * var(--k)); font-weight: 600; z-index: 3; }
-    /* flash + exposure (Figma: 38 circles, black 10%, at 280 / 538, gap 15) */
-    #camTools { right: calc(22 * var(--k)); top: calc(526 * var(--k)); display: flex; gap: calc(15 * var(--k)); }   /* right-aligned: brightness stays put when there's no flash */
+    /* flash (only on phones that allow it): 38 circle, level with the middle of the shutter */
+    #camTools { left: calc(292 * var(--k)); top: calc(604 * var(--k)); display: flex; }
     #camTools button { all: unset; cursor: pointer; width: calc(38 * var(--k)); height: calc(38 * var(--k)); border-radius: 50%;
       background: rgba(0,0,0,0.1); display: grid; place-items: center; }
     #camTools button[hidden] { display: none; }
@@ -93,11 +95,6 @@
     #camTools img { width: calc(20 * var(--k)); height: calc(20 * var(--k)); display: block; }
     #camTools button.on img { filter: invert(1); }
     #flashBtn.on img { filter: none; }
-    /* exposure slider: appears between the buttons and the shutter */
-    #expoBar { left: calc(40 * var(--k)); right: calc(40 * var(--k)); top: calc(588 * var(--k)); display: flex; align-items: center; gap: 10px;
-      color: #000; font-size: calc(13 * var(--k)); }
-    #expoBar[hidden] { display: none; }
-    #expoBar input { flex: 1; accent-color: #e9c94f; }
     /* tap to focus: a small yellow square where you tapped */
     #focusRing { position: absolute; width: calc(70 * var(--k)); height: calc(70 * var(--k)); margin: calc(-35 * var(--k)) 0 0 calc(-35 * var(--k));
       border: 1.5px solid #ffd60a; border-radius: 4px; pointer-events: none; opacity: 0; }
@@ -106,7 +103,7 @@
     #video { transition: transform 0.15s ease-out; }
     input[type=file] { display: none; }
     body.reviewing #shutter, body.reviewing #hint, body.reviewing #gallery, body.reviewing #zoomChip,
-    body.reviewing #camTools, body.reviewing #expoBar, body.reviewing #focusRing { display: none; }
+    body.reviewing #camTools, body.reviewing #focusRing { display: none; }
 
     /* ---------- review step (Figma: second phone-camera) ---------- */
     body:not(.reviewing) .review { display: none !important; }
@@ -203,12 +200,10 @@
     <!-- camera step -->
     <p id="hint">Fit your note inside the frame.</p>
     <button id="shutter" aria-label="Take photo"></button>
-    <label id="gallery" for="pick" aria-label="Choose from your photos"><img src="icons/gallery.svg" alt=""></label>
+    <label id="gallery" for="pick">or choose from your photos</label>
     <div id="camTools">
       <button id="flashBtn" aria-label="Flash" aria-pressed="false" hidden><img src="icons/flash-off.svg" alt=""></button>
-      <button id="expoBtn" aria-label="Brightness" aria-pressed="false"><img src="icons/exposure.svg" alt=""></button>
     </div>
-    <div id="expoBar" hidden><span>−</span><input id="expo" type="range" min="-2" max="2" step="0.1" value="0" aria-label="Brightness"><span>+</span></div>
 
     <!-- review step -->
     <p id="status" class="review">Reading your handwriting…</p>
@@ -313,17 +308,17 @@
     }
     startCamera();
 
-    // ---------- camera controls (Figma phone-camera): zoom, brightness, flash, tap to focus ----------
-    // Phones differ: Android Chrome lets websites use the real camera zoom / exposure / flash / focus,
-    // iPhone Safari allows less. Zoom and brightness always work (done on the picture if the camera can't);
+    // ---------- camera controls (Figma phone-camera): zoom, flash, tap to focus ----------
+    // Phones differ: Android Chrome lets websites use the real camera zoom / flash / focus,
+    // iPhone Safari allows less. Zoom always works (done on the picture if the camera can't);
     // flash only shows when the phone allows it.
-    let camTrack = null, caps = {}, zoom = 1, softExpo = 0;
+    let camTrack = null, caps = {}, zoom = 1;
     const hwZoom = () => caps.zoom && caps.zoom.max > caps.zoom.min;
     function setupCameraTools(t) {
       camTrack = t;
       try { caps = t.getCapabilities ? t.getCapabilities() : {}; } catch (e) { caps = {}; }
       $("flashBtn").hidden = !caps.torch;
-      track("camera_tools", { zoom: !!hwZoom(), exposure: !!caps.exposureCompensation, torch: !!caps.torch, focus: !!(caps.focusMode && caps.focusMode.length) });
+      track("camera_tools", { zoom: !!hwZoom(), torch: !!caps.torch, focus: !!(caps.focusMode && caps.focusMode.length) });
     }
     const apply = c => camTrack && camTrack.applyConstraints({ advanced: [c] }).catch(e => console.warn(e));
 
@@ -338,7 +333,25 @@
       }
       $("zoomChip").textContent = (Math.round(zoom * 10) / 10) + "x";
     }
-    $("zoomChip").onclick = e => { e.stopPropagation(); setZoom(zoom < 1.5 ? 2 : zoom < 2.5 ? 3 : 1); };
+    // the "1x" button, like the iPhone camera: tap = 1x → 2x → 3x, press and drag sideways = zoom smoothly
+    let chipDrag = null;
+    $("zoomChip").addEventListener("pointerdown", e => {
+      e.stopPropagation();
+      chipDrag = { x: e.clientX, z: zoom, moved: false };
+      $("zoomChip").setPointerCapture(e.pointerId);
+    });
+    $("zoomChip").addEventListener("pointermove", e => {
+      if (!chipDrag) return;
+      const dx = e.clientX - chipDrag.x;
+      if (Math.abs(dx) > 4) chipDrag.moved = true;
+      if (chipDrag.moved) setZoom(chipDrag.z * Math.pow(2, -dx / 90));   // drag left = closer, right = farther
+    });
+    $("zoomChip").addEventListener("pointerup", e => {
+      e.stopPropagation();
+      if (chipDrag && !chipDrag.moved) setZoom(zoom < 1.5 ? 2 : zoom < 2.5 ? 3 : 1);
+      chipDrag = null;
+    });
+    $("zoomChip").addEventListener("click", e => e.stopPropagation());
     // pinch on the window to zoom
     let pinch = null;
     const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
@@ -360,23 +373,6 @@
         setTimeout(() => apply({ focusMode: caps.focusMode.includes("continuous") ? "continuous" : "single-shot" }), 2500);
       }
     });
-
-    // brightness (exposure)
-    $("expoBtn").onclick = () => {
-      const open = $("expoBar").hidden;
-      $("expoBar").hidden = !open;
-      $("expoBtn").classList.toggle("on", open); $("expoBtn").setAttribute("aria-pressed", open);
-    };
-    $("expo").oninput = () => {
-      const v = +$("expo").value;
-      if (caps.exposureCompensation) {
-        const c = caps.exposureCompensation;
-        apply({ exposureMode: "continuous", exposureCompensation: Math.max(c.min, Math.min(c.max, v)) });
-      } else {                                           // done on the picture instead
-        softExpo = v;
-        $("video").style.filter = v ? `brightness(${1 + v * 0.25})` : "";
-      }
-    };
 
     // flash (torch light)
     let torchOn = false;
@@ -401,9 +397,7 @@
         sx += sw * (1 - 1 / zoom) / 2; sy += sh * (1 - 1 / zoom) / 2; sw /= zoom; sh /= zoom;
       }
       how = "camera";
-      cropFilter = softExpo ? `brightness(${1 + softExpo * 0.25})` : "none";   // brightness done on the picture
       useImage(v, sx, sy, sw, sh);
-      cropFilter = "none";
     };
 
     // ---------- gallery / fallback photo ----------
@@ -419,7 +413,6 @@
     $("pick").onchange = fromFile;
     $("snap").onchange = fromFile;
 
-    let cropFilter = "none";
     // Redrawing on a canvas also removes hidden photo data (GPS location etc.)
     function crop(src, sx, sy, sw, sh, maxSide, square = false) {
       if (square) {                                   // centre square (for the map)
@@ -430,7 +423,6 @@
       const c = document.createElement("canvas");
       c.width = Math.round(sw * k); c.height = Math.round(sh * k);
       const g = c.getContext("2d");
-      g.filter = cropFilter;
       g.drawImage(src, sx, sy, sw, sh, 0, 0, c.width, c.height);
       return c;
     }
