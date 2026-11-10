@@ -8,12 +8,18 @@
 //   5. saves anonymous visit events to the "events" tab (research)
 // ============================================================
 
-const VERSION = 7;   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
+const VERSION = 8;   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
 
 const SHEET_NAME = "notes";
 const HEADERS = ["id", "createdAt", "status", "flag", "text", "allowReplies", "color", "image", "session", "source", "replyTo"];
 const EVENT_HEADERS = ["time", "visitor", "visit", "event", "source", "device", "page", "detail"];
 const STATUSES = ["pending", "approved", "rejected", "flagged"];
+
+// ---------- moderation settings ----------
+const AUTO_APPROVE = true;    // true = safe notes and responses go live right away (you can still reject them in the Sheet)
+const DIGEST_EVERY = 10;      // email me a summary after this many new notes + responses
+const REJECT_GIBBERISH = true;    // test notes like "vhfbglsjfnv" are rejected automatically
+const REJECT_FACES = true;        // photos with a person's face are rejected automatically (keeps everyone anonymous)
 
 function getSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -130,8 +136,12 @@ function saveNote(body) {
   if (!replyTo && !/^i\s*wish\s*i\s*could/i.test(text)) text = "I wish I could " + text;   // responses keep their own words
   let image = String(body.image || "");
   if (image.length > 49000) image = "";              // a cell holds max 50,000 characters
-  const flag = checkNote(text);
-  const status = flag === "ok" ? "pending" : "flagged";
+  // checks: safety words → gibberish → a face in the photo
+  let flag = checkNote(text);
+  if (flag === "ok" && REJECT_GIBBERISH && looksLikeGibberish(text)) flag = "gibberish";
+  if (flag === "ok" && REJECT_FACES && image && hasFace(image)) flag = "person-in-photo";
+  const autoReject = flag === "gibberish" || flag === "person-in-photo";
+  const status = flag === "ok" ? (AUTO_APPROVE ? "approved" : "pending") : autoReject ? "rejected" : "flagged";
   const session = String(body.session || "").replace(/[^a-z0-9]/gi, "").slice(0, 20);
   const source = String(body.source || "").replace(/[^a-z0-9\-_]/gi, "").slice(0, 60);
   const id = Utilities.getUuid();
@@ -139,7 +149,8 @@ function saveNote(body) {
     id, new Date(), status, flag, text,
     replyTo ? false : body.allowReplies === true, String(body.color || ""), image, session, source, replyTo
   ]);
-  if (flag === "self-harm") notifyMe(text);
+  if (status === "flagged") notifyMe(text, flag, replyTo);     // flagged: email right away
+  countForDigest();                                             // every DIGEST_EVERY: a summary email
   return { ok: true, status, flag, id };     // id: so the screen can give the note its real id
 }
 
@@ -176,13 +187,68 @@ function checkNote(text) {
   return "ok";
 }
 
-function notifyMe(text) {
-  MailApp.sendEmail(
-    Session.getEffectiveUser().getEmail(),
-    "Common Ground: a note needs attention",
-    "A submitted note was flagged for self-harm and was NOT published.\n\n" +
-    "Text: " + text + "\n\nThe writer was shown the 988 support message."
-  );
+// ---------- automatic checks ----------
+// Gibberish: keyboard mashing ("vhfbglsjfnv") or a misread photo that's mostly stray letters ("V ? LA OK } d I C").
+// Tested on all 81 starting notes: none of them is caught.
+function looksLikeGibberish(text) {
+  const core = String(text).replace(/^\s*i\s*wish\s*i\s*could\s*/i, "").toLowerCase();
+  const words = core.match(/[a-z]+/g) || [];
+  if (!words.length) return true;
+  const odd = w => w.length > 3 && (!/[aeiouy]/.test(w) || /[bcdfghjklmnpqrstvwxz]{5,}/.test(w) || /(.)\1\1/.test(w));
+  const letters = words.join("").length, oddLetters = words.filter(odd).join("").length;
+  if (oddLetters / letters > 0.4) return true;
+  const SHORT = ["a","i","to","me","my","be","go","do","so","no","up","in","on","of","it","is","us","we","an","at","or","if","by","he","ok","am","as","oh","hi","ai","tv"];
+  const stray = words.filter(w => w.length <= 2 && SHORT.indexOf(w) === -1).length;
+  return words.length >= 3 && stray / words.length >= 0.5;
+}
+
+// A person in the photo: Google Cloud Vision face detection (same key as the handwriting reading)
+function hasFace(dataUrl) {
+  try {
+    const b64 = String(dataUrl).split(",")[1];
+    if (!b64) return false;
+    const key = PropertiesService.getScriptProperties().getProperty("VISION_API_KEY");
+    const res = UrlFetchApp.fetch("https://vision.googleapis.com/v1/images:annotate?key=" + key, {
+      method: "post", contentType: "application/json", muteHttpExceptions: true,
+      payload: JSON.stringify({ requests: [{ image: { content: b64 }, features: [{ type: "FACE_DETECTION", maxResults: 3 }] }] })
+    });
+    const r = (JSON.parse(res.getContentText()).responses || [])[0] || {};
+    return (r.faceAnnotations || []).some(f => f.detectionConfidence >= 0.6);
+  } catch (e) { return false; }           // if the check fails, don't block the note
+}
+
+// ---------- emails ----------
+function sheetLink() { return SpreadsheetApp.getActiveSpreadsheet().getUrl(); }
+
+// flagged (self-harm, personal info, held words): email right away. Flagged notes are NOT shown on the site.
+function notifyMe(text, flag, replyTo) {
+  const what = replyTo ? "A response" : "A note";
+  const why = flag === "self-harm" ? "self-harm. The writer was shown the 988 support message"
+    : flag === "personal-info" ? "possible personal information (email, phone number, @handle or link)"
+    : "a word on your hold list";
+  MailApp.sendEmail(Session.getEffectiveUser().getEmail(),
+    "Common Ground: " + what.toLowerCase() + " was flagged",
+    what + " was flagged for " + why + ".\nIt is NOT shown on the site.\n\n" +
+    "Text: " + text + "\n\nTo post it anyway, change its status to \"approved\" in the Sheet:\n" + sheetLink());
+}
+
+// every DIGEST_EVERY new notes + responses: one summary email
+function countForDigest() {
+  const lock = LockService.getScriptLock();
+  try { lock.waitLock(5000); } catch (e) { return; }
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const n = Number(props.getProperty("SINCE_DIGEST") || 0) + 1;
+    if (n < DIGEST_EVERY) { props.setProperty("SINCE_DIGEST", String(n)); return; }
+    props.setProperty("SINCE_DIGEST", "0");
+    const rows = getSheet().getDataRange().getValues().slice(1).slice(-DIGEST_EVERY);
+    const lines = rows.map((r, i) => (i + 1) + ". [" + r[2] + (r[3] !== "ok" ? ", " + r[3] : "") + "] " +
+      (r[10] ? "(response) " : "") + String(r[4]).slice(0, 140));
+    MailApp.sendEmail(Session.getEffectiveUser().getEmail(),
+      "Common Ground: " + DIGEST_EVERY + " new notes and responses",
+      "These are already live on the site (except rejected / flagged ones).\n" +
+      "To take one down, change its status to \"rejected\" in the Sheet.\n\n" + lines.join("\n") + "\n\n" + sheetLink());
+  } finally { lock.releaseLock(); }
 }
 
 // ---------- "responses" tab: see every response next to the note it answers ----------

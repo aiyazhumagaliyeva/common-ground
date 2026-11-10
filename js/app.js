@@ -415,7 +415,9 @@ async function startHandoff() {
     if (closeLive) { closeLive(); closeLive = null; }
     track("note_arrived", { flag: data.flag, live: liveOn() });
     if (data.flag === "self-harm") { pillMessage("Thank you. This note won’t be posted. Please check your phone."); return; }
-    if (data.flag && data.flag !== "ok") { pillMessage("Thank you. Your note will be reviewed before it appears."); return; }
+    if (data.flag === "gibberish") { pillMessage("We couldn’t read that note. Please try again with a clearer photo."); return; }
+    if (data.flag === "person-in-photo") { pillMessage("That photo has a person in it, so it wasn’t posted. Please photograph just the note."); return; }
+    if (data.flag && data.flag !== "ok") { pillMessage("Thank you. Your note will be checked before it appears."); return; }
     $("handoffPill").hidden = true;
     hidePages();
     arrive(data);                               // back to the map: the note flies in

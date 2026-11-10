@@ -237,9 +237,16 @@
     <!-- opened from the big screen's QR: the note lives there -->
     <p class="withScreen">Look at the screen. Your note is landing on the board.</p>
     <!-- opened on its own (printed QR): show the board on this phone -->
-    <p class="alone">It will appear for everyone after review. For now, only you can see it on the board.</p>
+    <p class="alone">It’s on the board now.</p>
     <a class="btn primary alone" href="index.html?mine=1">See where it landed</a>
     <button class="btn" id="again">Add another note</button>
+  </div>
+
+  <!-- not posted: a test / unreadable note, a person in the photo, or held for review -->
+  <div class="screen" id="notPosted">
+    <h1 id="npTitle">This note wasn’t posted.</h1>
+    <p id="npText"></p>
+    <button class="btn primary" id="npAgain">Take another photo</button>
   </div>
 
   <!-- self-harm support -->
@@ -489,7 +496,18 @@
         tell(SESSION, { step: "sent", note: flag === "ok" ? { id: saved.id || "", text: full, image: thumb, allowReplies, flag, replyTo: REPLY } : { flag, replyTo: REPLY } });
         track("submit", { allowReplies, edited: text !== ocrText, how, withScreen: !!SESSION });
         if (stream) stream.getTracks().forEach(t => t.stop());
-        const safe = checkNote(full) !== "self-harm";
+        const safe = flag !== "self-harm" && checkNote(full) !== "self-harm";
+        // not posted (checked on the server): say why, and offer another try
+        if (safe && flag !== "ok") {
+          const why = {
+            "gibberish": ["We couldn’t read this note.", "Try a clearer photo, with the whole note inside the frame."],
+            "person-in-photo": ["This photo wasn’t posted.", "There’s a person in it. To keep everyone anonymous, take a photo of just the note."],
+          }[flag] || ["Thank you!", "Your note will be checked before it appears on the board."];
+          $("npTitle").textContent = why[0]; $("npText").textContent = why[1];
+          $("npAgain").hidden = !(flag === "gibberish" || flag === "person-in-photo");
+          $("notPosted").classList.add("show");
+          return;
+        }
         if (safe) {
           $("frost").style.maskImage = $("frost").style.webkitMaskImage = "none";   // close the window
           document.body.classList.add("sending");         // fly the note up and away
@@ -512,6 +530,7 @@
     };
 
     $("again").onclick = () => location.reload();
+    $("npAgain").onclick = () => location.reload();
 
     async function post(body) {
       // plain text avoids the extra "preflight" request Apps Script can't answer
