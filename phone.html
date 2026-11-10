@@ -405,12 +405,14 @@
 
     // flash (torch light)
     let torchOn = false;
-    $("flashBtn").onclick = () => {
-      torchOn = !torchOn;
-      apply({ torch: torchOn });
-      $("flashBtn").classList.toggle("on", torchOn); $("flashBtn").setAttribute("aria-pressed", torchOn);
-      $("flashBtn").querySelector("img").src = torchOn ? "icons/flash-on.svg" : "icons/flash-off.svg";
-    };
+    function setTorch(on) {
+      if (torchOn === on) return;
+      torchOn = on;
+      apply({ torch: on });
+      $("flashBtn").classList.toggle("on", on); $("flashBtn").setAttribute("aria-pressed", on);
+      $("flashBtn").querySelector("img").src = on ? "icons/flash-on.svg" : "icons/flash-off.svg";
+    }
+    $("flashBtn").onclick = () => setTorch(!torchOn);
 
     // ---------- shutter: crop exactly what's inside the square ----------
     $("shutter").onclick = () => {
@@ -426,6 +428,7 @@
         sx += sw * (1 - 1 / zoom) / 2; sy += sh * (1 - 1 / zoom) / 2; sw /= zoom; sh /= zoom;
       }
       how = "camera";
+      setTimeout(() => setTorch(false), 0);              // flash goes off right after the photo
       cropFilter = softExpo ? `brightness(${1 + softExpo * 0.25})` : "none";   // brightness done on the picture
       useImage(v, sx, sy, sw, sh);
       cropFilter = "none";
