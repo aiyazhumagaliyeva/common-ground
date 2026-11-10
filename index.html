@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -70,7 +70,7 @@
         padding: 12px 24px; font-size: 16px; }
       .nvResp { width: 26vw; height: 26vw; }
     }
-    #tourCopy.phone { position: fixed; left: 24px; right: 24px; bottom: 170px; width: auto; z-index: 1; }
+    #tourCopy.phone { position: fixed; left: 24px; right: 24px; bottom: 110px; width: auto; z-index: 1; }
     #tourCopy.phone #tourText { font-size: 18px; }
     #tourCopy.phone #tourImage { max-width: 100%; }
 
@@ -86,8 +86,8 @@
     #tourImage[hidden] { display: none; }
     #tourCursor { position: absolute; width: calc(31 * var(--k)); height: auto; pointer-events: none; }
     #tourCursor.drag { animation: tourDrag 2.4s ease-in-out infinite; }
-    /* phones: hand drawings, white so they show on the grey veil; the fingertip sits on the point */
-    #tourCursor.hand { width: 96px; margin: -14px 0 0 -22px; filter: invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.35)); }
+    /* phones: hand drawings; the fingertip sits on the point */
+    #tourCursor.hand { width: 96px; margin: -14px 0 0 -22px; }   /* your drawings as they are: black lines, white fill */
     @keyframes tourDrag { 0%, 12% { transform: translate(0, 0) scale(1); } 18% { transform: translate(0, 0) scale(0.88); }
       70% { transform: translate(var(--dx), var(--dy)) scale(0.88); } 78%, 100% { transform: translate(var(--dx), var(--dy)) scale(1); } }
     body.touring #helpBtn { z-index: 7; }
@@ -228,6 +228,7 @@
       .page h1 { margin-top: 72px; padding: 0 16px; font-size: 22px; }
     }
     .privacy { font-size: 0.85em; color: rgba(0,0,0,0.5); }
+    a.brand { color: #000; text-decoration: none; cursor: pointer; }   /* clicking the name reloads the page */
 
     /* ---------- PHONE (Figma: phone-home, phone-menu, phone-about, phone-contact) ---------- */
     #phoneBar, #phoneMenu, .mob { display: none; }
@@ -241,12 +242,12 @@
         align-items: center; justify-content: space-between; transition: opacity 0.3s ease; }
       body.page-open #phoneBar { opacity: 0; pointer-events: none; }
       #phoneBar button, #phoneMenu button { all: unset; cursor: pointer; }
-      #menuBtn { padding: 12px; margin: -12px; }
+      #phoneBar #menuBtn { padding: 22px; margin: -22px; }       /* the icon stays put; the tap area is ~67 × 62 */
       #menuBtn img { width: 23px; height: 18px; display: block; }
       /* menu: white screen, big links */
       #phoneMenu:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 9; background: #fff; animation: tourIn 0.25s ease-out; }
       #phoneMenu .top { position: absolute; left: 26px; right: 33px; top: calc(30px + env(safe-area-inset-top, 0px)); display: flex; align-items: center; justify-content: space-between; }
-      #menuClose { padding: 12px; margin: -12px; }
+      #phoneMenu #menuClose { padding: 24px; margin: -24px; }
       #menuClose img { width: 16px; height: 16px; display: block; }
       #phoneMenu .items { position: absolute; left: 26px; top: calc(133px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 40px; }
       #phoneMenu .items button { font-family: Helvetica, Arial, sans-serif; font-size: 32px; color: #000; }
@@ -260,6 +261,10 @@
       .about { width: auto; margin: 20px 25px 0; gap: 30px; padding-bottom: 80px; }   /* Figma phone-about: 345 wide, 30 between blocks */
       .about h2 + .text { margin-top: -10px; }                                         /* 20 between a heading and its text */
       .about p, .about li { font-size: 16px; line-height: 1.45; }   /* more air between lines: easier to read on a narrow screen */
+      /* even edges on a narrow column: justified, and only long words (10+ letters) may break with a hyphen */
+      .about .text p, .about .text li, .about > p { text-align: justify; text-wrap: pretty;
+        hyphens: auto; -webkit-hyphens: auto; hyphenate-limit-chars: 10 4 4;
+        -webkit-hyphenate-limit-before: 4; -webkit-hyphenate-limit-after: 4; -webkit-hyphenate-limit-lines: 1; }
       .about h2 { font-size: 18px; }
       .contact { width: auto; margin: 20px 25px; font-size: 16px; line-height: 1.45; }
       /* add a note: one column of steps, "Submit a note" button at the bottom */
@@ -283,12 +288,12 @@
 
   <!-- ---------- PHONE HEADER + MENU (Figma: phone-home, phone-menu) ---------- -->
   <header id="phoneBar">
-    <span class="brand">Common Ground</span>
+    <a class="brand" href="">Common Ground</a>
     <button id="menuBtn" aria-label="Open the menu" aria-expanded="false"><img src="icons/menu.svg" alt=""></button>
   </header>
   <div id="phoneMenu" hidden>
     <div class="top">
-      <span class="brand">Common Ground</span>
+      <a class="brand" href="">Common Ground</a>
       <button id="menuClose" aria-label="Close the menu"><img src="icons/close.svg" alt=""></button>
     </div>
     <nav class="items" aria-label="Menu">
@@ -323,7 +328,7 @@
   <button type="button" id="helpBtn" aria-label="How to use Common Ground"><img src="icons/question.svg" alt=""></button>
 
   <nav id="nav">
-    <span class="brand">Common Ground</span>
+    <a class="brand" href="">Common Ground</a>
     <img class="divider" src="icons/divider-thin.svg" alt="">
     <button id="navAdd">Add a note
       <img class="camera" src="icons/camera.svg" alt="">
