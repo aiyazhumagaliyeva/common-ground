@@ -8,7 +8,7 @@
 //   5. saves anonymous visit events to the "events" tab (research)
 // ============================================================
 
-const VERSION = 8;   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
+const VERSION = 9;   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
 
 const SHEET_NAME = "notes";
 const HEADERS = ["id", "createdAt", "status", "flag", "text", "allowReplies", "color", "image", "session", "source", "replyTo"];
@@ -36,6 +36,8 @@ function getSheet() {
   if (sh.getRange(1, 10).getValue() !== "source") sh.getRange(1, 10).setValue("source");
   if (sh.getRange(1, 11).getValue() !== "replyTo") sh.getRange(1, 11).setValue("replyTo");   // which note a response answers
   if (!ss.getSheetByName("responses")) getResponsesSheet();   // made automatically, no need to run setup
+  if (!ss.getSheetByName("sources")) getSourcesSheet();
+  if (!ss.getSheetByName("links")) getLinksSheet();
   return sh;
 }
 
@@ -358,5 +360,49 @@ function getResponsesSheet() {
   return sh;
 }
 
+// ---------- "sources" tab: where visitors came from (QR codes, links, Instagram…) ----------
+// One row per source, counted live from the events and notes tabs. Read-only.
+function getSourcesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  getEventsSheet();
+  let sh = ss.getSheetByName("sources");
+  if (!sh) sh = ss.insertSheet("sources");
+  sh.clear();
+  sh.getRange("A1:F1").setValues([["source", "visits to the map", "people", "notes opened", "notes added", "responses"]]).setFontWeight("bold");
+  sh.getRange("A2").setFormula('=SORT(UNIQUE(FILTER(events!E2:E, events!E2:E<>"")))');
+  sh.getRange("B2").setFormula('=ARRAYFORMULA(IF(A2:A="",, COUNTIFS(events!E:E, A2:A, events!D:D, "page_view", events!G:G, "index.html")))');
+  sh.getRange("C2").setFormula('=MAP(A2:A, LAMBDA(s, IF(s="",, COUNTUNIQUE(FILTER(events!B:B, events!E:E=s)))))');
+  sh.getRange("D2").setFormula('=ARRAYFORMULA(IF(A2:A="",, COUNTIFS(events!E:E, A2:A, events!D:D, "note_open")))');
+  sh.getRange("E2").setFormula('=ARRAYFORMULA(IF(A2:A="",, COUNTIFS(notes!J:J, A2:A, notes!K:K, "")))');
+  sh.getRange("F2").setFormula('=ARRAYFORMULA(IF(A2:A="",, COUNTIFS(notes!J:J, A2:A, notes!K:K, "<>")))');
+  sh.getRange("H1").setValue("What the sources mean").setFontWeight("bold");
+  sh.getRange("H2:H6").setValues([["Your own codes (from the links tab or make-qr.html), e.g. poster-bushwick"],
+    ["instagram / tiktok / twitter / facebook / google: came from that site"], ["direct: typed the address, a bookmark, or a link sent in a chat app"],
+    ["internal: moved between pages of the site"], ["ref-…: came from another website"]]);
+  sh.setFrozenRows(1);
+  sh.setColumnWidth(1, 200); sh.setColumnWidth(8, 420);
+  return sh;
+}
+
+// ---------- "links" tab: make a tracked link + QR for each place you share the site ----------
+// Type a short name in column A (e.g. poster-bushwick, instagram-story). The link and QR fill in by themselves.
+// Visits from that link show up under the same name in the "sources" tab.
+function getLinksSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName("links");
+  if (!sh) sh = ss.insertSheet("links");
+  sh.clear();
+  sh.getRange("A1:C1").setValues([["name (type here)", "link to share", "QR code"]]).setFontWeight("bold");
+  sh.getRange("A2:A4").setValues([["poster-parsons"], ["instagram-story"], ["flyer-bushwick"]]);
+  const base = "https://aiyazhumagaliyeva.github.io/common-ground/?src=";
+  sh.getRange("B2").setFormula('=ARRAYFORMULA(IF(A2:A="",, "' + base + '" & LOWER(SUBSTITUTE(TRIM(A2:A), " ", "-"))))');
+  sh.getRange("C2").setFormula('=ARRAYFORMULA(IF(B2:B="",, IMAGE("https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=" & ENCODEURL(B2:B))))');
+  sh.setFrozenRows(1);
+  sh.setColumnWidth(1, 200); sh.setColumnWidth(2, 460); sh.setColumnWidth(3, 130);
+  sh.setRowHeights(2, 50, 120);
+  sh.getRange("E1").setValue("For printing, make-qr.html makes the same link as a styled QR (your Figma look).");
+  return sh;
+}
+
 // Run once from the editor (select "setup" → Run).
-function setup() { getSheet(); getEventsSheet(); getResponsesSheet(); }
+function setup() { getSheet(); getEventsSheet(); getResponsesSheet(); getSourcesSheet(); getLinksSheet(); }
