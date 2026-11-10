@@ -156,7 +156,7 @@ graph.width(window.innerWidth).height(window.innerHeight)
   .backgroundColor(CONFIG.BG_COLOR || "#ffffff")
   .showNavInfo(false)
   .enableNodeDrag(false)                 // dragging always turns the whole map, never moves one note
-  .nodeLabel(n => n.text)
+  .nodeLabel(() => "")                  // no small text box on hover or tap
   .nodeThreeObject(makeNote)
   .cooldownTime(2500);
 // Retina screens draw 4× the pixels; above this the map gets laggy (most of all when zoomed in)
@@ -360,11 +360,11 @@ function phoneConnected(title) {
   if ($("addPage").classList.contains("open")) { hidePages(); track("add_autoclose"); }
 }
 
-const isPhone = matchMedia("(pointer: coarse)").matches && innerWidth < 900;
+const isPhone = () => innerWidth <= 600 || (matchMedia("(pointer: coarse)").matches && innerWidth < 900);   // narrow window counts too (phone preview on a laptop)
 $("navAdd").addEventListener("click", () => {
   openPage("addPage");
-  track("add_open", { phone: isPhone });
-  if (!isPhone) loadModel().catch(() => {});        // get the AI ready before the note arrives
+  track("add_open", { phone: isPhone() });
+  if (!isPhone()) loadModel().catch(() => {});        // get the AI ready before the note arrives
   $("qr").hidden = false;
   $("qrCaption").hidden = false;
   startHandoff();
@@ -386,7 +386,7 @@ document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeAll(); });
 
 async function startHandoff() {
-  if (isPhone) {                                     // on a phone: no QR, go straight to the camera
+  if (isPhone()) {                                     // on a phone: no QR, go straight to the camera
     $("qr").hidden = true;
     $("qrCaption").hidden = true;
     $("openCamera").hidden = false;
@@ -801,7 +801,7 @@ function drawResponses(n, animateLast = false) {
 async function startRespond() {
   if (!viewNote) return;
   const n = viewNote;
-  if (isPhone && $("tour").hidden) {
+  if (isPhone() && $("tour").hidden) {
     track("respond_open", { id: n.id, phone: true });
     location.href = "phone.html?reply=" + encodeURIComponent(n.id) + (SOURCE !== "direct" ? "&src=" + encodeURIComponent(SOURCE) : "");
     return;

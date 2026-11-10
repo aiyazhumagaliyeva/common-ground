@@ -41,7 +41,7 @@
       white-space: nowrap; user-select: none; -webkit-user-select: none; transition: opacity 0.3s ease, background-color 0.2s; }
     #nvRespond[hidden] { display: none; }
     #nvRespond img { width: max(16px, calc(20 * var(--k))); height: auto; display: block; }
-    #nvRespond:hover { background: #fff3c4; }
+    @media (hover: hover) { #nvRespond:hover { background: #fff3c4; } }
     #nvRespond:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
     #noteView.responding #nvRespond { opacity: 0; pointer-events: none; }
     /* responses sit on top of the note */
@@ -235,7 +235,7 @@
       #nav { display: none; }
       .brand-phone, #phoneBar .brand, #phoneMenu .brand { font-family: Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 20px; color: #000; white-space: nowrap; }
       /* header: name left, menu icon right */
-      #phoneBar { display: flex; position: fixed; z-index: 5; left: 26px; right: 33px; top: calc(14px + env(safe-area-inset-top, 0px));
+      #phoneBar { display: flex; position: fixed; z-index: 5; left: 26px; right: 33px; top: calc(30px + env(safe-area-inset-top, 0px));
         align-items: center; justify-content: space-between; transition: opacity 0.3s ease; }
       body.page-open #phoneBar { opacity: 0; pointer-events: none; }
       #phoneBar button, #phoneMenu button { all: unset; cursor: pointer; }
@@ -243,22 +243,23 @@
       #menuBtn img { width: 23px; height: 18px; display: block; }
       /* menu: white screen, big links */
       #phoneMenu:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 9; background: #fff; animation: tourIn 0.25s ease-out; }
-      #phoneMenu .top { position: absolute; left: 28px; right: 33px; top: calc(19px + env(safe-area-inset-top, 0px)); display: flex; align-items: center; justify-content: space-between; }
+      #phoneMenu .top { position: absolute; left: 26px; right: 33px; top: calc(30px + env(safe-area-inset-top, 0px)); display: flex; align-items: center; justify-content: space-between; }
       #menuClose { padding: 12px; margin: -12px; }
       #menuClose img { width: 16px; height: 16px; display: block; }
-      #phoneMenu .items { position: absolute; left: 28px; top: calc(122px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 40px; }
+      #phoneMenu .items { position: absolute; left: 26px; top: calc(133px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 40px; }
       #phoneMenu .items button { font-family: Helvetica, Arial, sans-serif; font-size: 32px; color: #000; }
       /* pages: back arrow + name at the top */
       .page .back { position: fixed; left: 0; right: 0; top: 0; z-index: 2; display: flex; align-items: center; gap: 16px;
-        padding: calc(19px + env(safe-area-inset-top, 0px)) 17px 12px; background: #fff; }
+        padding: calc(30px + env(safe-area-inset-top, 0px)) 25px 12px; background: #fff; }
       .page .back img { display: none; }
       .page .back::before { content: ""; width: 19px; height: 16px; background: url(icons/arrow-left.svg) no-repeat center / contain; }
       .page .back::after { content: "Common Ground"; font-family: Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 20px; color: #000; }
-      .page h1 { margin-top: calc(76px + env(safe-area-inset-top, 0px)); padding: 0 16px; font-size: 20px; }
-      .about { width: auto; margin: 30px 17px 0; gap: 28px; padding-bottom: 80px; }
+      .page h1 { margin-top: calc(90px + env(safe-area-inset-top, 0px)); padding: 0 25px; font-size: 20px; }
+      .about { width: auto; margin: 20px 25px 0; gap: 30px; padding-bottom: 80px; }   /* Figma phone-about: 345 wide, 30 between blocks */
+      .about h2 + .text { margin-top: -10px; }                                         /* 20 between a heading and its text */
       .about p, .about li { font-size: 16px; }
       .about h2 { font-size: 18px; }
-      .contact { width: auto; margin: 20px 17px; font-size: 16px; }
+      .contact { width: auto; margin: 20px 25px; font-size: 16px; }
       /* add a note: one column of steps, "Submit a note" button at the bottom */
       .steps { width: 325px; max-width: calc(100vw - 48px); margin: 40px auto 0; grid-template-columns: 1fr; row-gap: 40px; padding-bottom: 140px; }
       .step .num { width: 34px; font-size: 20px; }
