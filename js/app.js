@@ -480,15 +480,15 @@ function fitCamera(ms = 1200) {
   graph.cameraPosition({ x: 0, y: 0, z }, { x: 0, y: 0, z: 0 }, ms);
 }
 
-function flyTo(node) {
+function flyTo(node, ms = 1500) {
   const dist = CONFIG.NOTE_SIZE * 4, r = Math.hypot(node.tx, node.ty, node.tz) || 1;   // how close it flies
   const k = 1 + dist / r;
   graph.cameraPosition({ x: node.tx * k, y: node.ty * k, z: node.tz * k },
-                       { x: node.tx, y: node.ty, z: node.tz }, 1500);
+                       { x: node.tx, y: node.ty, z: node.tz }, ms);
 }
 
 // ---- click a ball: it flies close and unfolds into the note ----
-let selected = null;
+let selected = null, openViewTimer = null;
 async function openNote(node) {
   if (selected === node || node.__arriving) return;
   if (selected) closeNote();
@@ -496,7 +496,12 @@ async function openNote(node) {
   controls.autoRotate = false;
   track("note_open", { id: node.id });
   node.__openedAt = performance.now();
-  if (imageLook()) { showNoteView(node); return; }         // photo notes: the note view (Figma)
+  if (imageLook()) {                                     // photo notes: fly in close, then the note view (Figma)
+    flyTo(node, 1100);
+    clearTimeout(openViewTimer);
+    openViewTimer = setTimeout(() => { if (selected === node) showNoteView(node); }, 750);
+    return;
+  }
   flyTo(node);
   const m = node.__crumple.mesh;
   m.visible = true; m.material.opacity = 1;
@@ -512,7 +517,7 @@ async function closeNote() {
   if (!n) return;
   selected = null;
   track("note_close", { id: n.id, seconds: Math.round((performance.now() - n.__openedAt) / 1000) });
-  if (imageLook()) { hideNoteView(); controls.autoRotate = CONFIG.DRIFT_SPEED > 0; return; }
+  if (imageLook()) { clearTimeout(openViewTimer); hideNoteView(); controls.autoRotate = CONFIG.DRIFT_SPEED > 0; return; }
   await tween(600, e => {
     n.__crumple.setProgress(e);
     n.__group.scale.setScalar(CONFIG.OPEN_SCALE - e * (CONFIG.OPEN_SCALE - 1));
@@ -927,10 +932,27 @@ function startTour() {
   track("tour_start");
   nextTourStep();
 }
+// zoom step: the map zooms in and back out, so you see what zooming does
+let zoomDemoTimer = null, zoomDemoFrom = null;
+function startZoomDemo() {
+  const cam = graph.camera(), t = controls.target.clone();
+  zoomDemoFrom = cam.position.clone();
+  const near = t.clone().add(zoomDemoFrom.clone().sub(t).multiplyScalar(0.45));
+  let zoomedIn = false;
+  const step = () => { zoomedIn = !zoomedIn; graph.cameraPosition(zoomedIn ? near : zoomDemoFrom, t, 1300); };
+  step();
+  zoomDemoTimer = setInterval(step, 2200);
+}
+function stopZoomDemo() {
+  if (!zoomDemoTimer) return;
+  clearInterval(zoomDemoTimer); zoomDemoTimer = null;
+  graph.cameraPosition(zoomDemoFrom, controls.target, 600);
+}
 function endTour() {
+  stopZoomDemo();
   clearTimeout(tourTimer); clearInterval(tourTimer);
   if (demoAnim) { demoAnim.cancel(); demoAnim = null; }
-  if (tourNote || viewNote) { closeNote(); tourNote = null; }
+  if (tourNote || viewNote || selected) { closeNote(); tourNote = null; fitCamera(1200); }
   $("tour").classList.remove("clear");
   controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
   $("tour").hidden = true;
@@ -939,6 +961,7 @@ function endTour() {
   track("tour_end", { step: tourStep });
 }
 function nextTourStep() {
+  stopZoomDemo();
   clearTimeout(tourTimer); clearInterval(tourTimer);
   if (demoAnim) { demoAnim.cancel(); demoAnim = null; }
   if (tourNote && !(TOUR[tourStep + 1] || {}).respond) { closeNote(); tourNote = null; }   // keep the note open for the respond step
@@ -972,19 +995,20 @@ function nextTourStep() {
       clickDemo(cur, st);
     }
   }
+  if (st.id === "zoom") startZoomDemo();
   if (st.id === "rotate" && touch) { controls.autoRotate = true; controls.autoRotateSpeed = 3; }
   // open step: after the click, the note under the cursor opens
   // respond step: a note is open, the cursor clicks "get a response QR code"
   $("tour").classList.toggle("clear", !!(st.respond && viewNote));   // the note view already greys the map (no white flash)
   if (st.respond) {
-    if (!viewNote) { const n = noteNear([688, 544]) || notes.find(x => x.allowReplies && x.__group); if (n) { tourNote = n; openNote(n); $("tour").classList.add("clear"); } }
+    if (!viewNote) { const n = noteNear([688, 544]) || notes.find(x => x.allowReplies && x.__group); if (n) { tourNote = n; openNote(n); } }
     else tourNote = selected;
-    tourTimer = setTimeout(() => { if (TOUR[tourStep] === st && viewNote) startRespond(); }, 2600 * 0.62);
+    tourTimer = setTimeout(() => { if (TOUR[tourStep] === st && viewNote) startRespond(); }, 2600 * 0.62 + (viewNote ? 0 : 800));
   }
   if (st.opensNote) {
     tourTimer = setTimeout(() => {
       const n = noteNear(st.from);
-      if (n && tourStep === TOUR.indexOf(st)) { tourNote = n; openNote(n); $("tour").classList.add("clear"); }
+      if (n && tourStep === TOUR.indexOf(st)) { tourNote = n; openNote(n); }
     }, 2600 * 0.62);
   }
 }
@@ -1063,6 +1087,7 @@ function showNoteView(n) {
   v.classList.remove("responding");
   drawResponses(n);
   v.hidden = false;
+  if (!$("tour").hidden) $("tour").classList.add("clear");   // walkthrough: the note view greys the map now
 }
 function hideNoteView() {
   stopRespond();
