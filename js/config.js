@@ -23,7 +23,7 @@ export const CONFIG = {
 
   // ---- RESEARCH TRACKING (see js/track.js) ----
   TRACKING: true,         // false = record nothing
-  CLARITY_ID: "",         // Microsoft Clarity project ID for heatmaps (clarity.microsoft.com)
+  CLARITY_ID: "zb9q6pp08y",         // Microsoft Clarity project ID for heatmaps (clarity.microsoft.com)
 
   // ---- CLUSTERING (how groups emerge) ----
   // How similar two notes must be to belong together (0 = anything, 1 = identical).

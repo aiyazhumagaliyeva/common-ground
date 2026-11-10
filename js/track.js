@@ -90,6 +90,7 @@ addEventListener("pagehide", () => {
 // ---- Microsoft Clarity (heatmaps, scroll maps, session recordings) ----
 function loadClarity() {
   if (!CONFIG.CLARITY_ID || window.clarity) return;
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return;   // don't record your own Go Live testing
   (function (c, l, a, r, i, t, y) {
     c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
     t = l.createElement(r); t.async = 1; t.src = "https://www.clarity.ms/tag/" + i;
