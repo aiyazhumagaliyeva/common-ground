@@ -8,7 +8,7 @@
 //   5. saves anonymous visit events to the "events" tab (research)
 // ============================================================
 
-const VERSION = 9;   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
+const VERSION = 10;   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
 
 const SHEET_NAME = "notes";
 const HEADERS = ["id", "createdAt", "status", "flag", "text", "allowReplies", "color", "image", "session", "source", "replyTo"];
@@ -360,49 +360,110 @@ function getResponsesSheet() {
   return sh;
 }
 
-// ---------- "sources" tab: where visitors came from (QR codes, links, Instagram…) ----------
-// One row per source, counted live from the events and notes tabs. Read-only.
-function getSourcesSheet() {
+// ---------- where you share the site ("channels") ----------
+// SAME LIST as js/channels.js (the QR maker). To add one: add a line in both. [label, id, group]
+const CHANNELS = [
+  ["Poster (QR on the street)", "poster", "Print and in person"],
+  ["Flyer or postcard handed out", "flyer", "Print and in person"],
+  ["Sticker", "sticker", "Print and in person"],
+  ["Sign at a table, caf\u00e9 or shop", "table_sign", "Print and in person"],
+  ["Event, exhibition or open studio", "event", "Print and in person"],
+  ["Class, crit or presentation", "class", "Print and in person"],
+  ["Business card", "business_card", "Print and in person"],
+  ["Instagram post", "ig_post", "Instagram"],
+  ["Instagram reel", "ig_reel", "Instagram"],
+  ["Instagram story", "ig_story", "Instagram"],
+  ["Instagram bio", "ig_bio", "Instagram"],
+  ["Instagram DM", "ig_dm", "Instagram"],
+  ["TikTok video", "tiktok_video", "TikTok"],
+  ["TikTok bio", "tiktok_bio", "TikTok"],
+  ["LinkedIn", "linkedin", "Other social"],
+  ["X (Twitter)", "x", "Other social"],
+  ["Threads", "threads", "Other social"],
+  ["Pinterest", "pinterest", "Other social"],
+  ["YouTube", "youtube", "Other social"],
+  ["Facebook", "facebook_post", "Other social"],
+  ["Reddit", "reddit", "Other social"],
+  ["Discord, Slack or a group chat", "discord", "Other social"],
+  ["Are.na", "arena", "Other social"],
+  ["Sent in a chat (text, WhatsApp, iMessage\u2026)", "chat", "Messages"],
+  ["Email or newsletter", "email", "Messages"],
+  ["Your portfolio site", "portfolio", "Web"],
+  ["Article, blog or interview", "press", "Web"],
+  ["Another website", "website", "Web"],
+  ["Other", "other", "Other"],
+  // found by the site itself, when a link has no code
+  ["Instagram (no code)", "instagram", "Found automatically"],
+  ["TikTok (no code)", "tiktok", "Found automatically"],
+  ["X / Twitter (no code)", "twitter", "Found automatically"],
+  ["Facebook (no code)", "facebook", "Found automatically"],
+  ["Google search", "google", "Found automatically"],
+  ["Another website (no code)", "ref", "Found automatically"],
+  ["Direct (typed, bookmark or chat app)", "direct", "Found automatically"],
+  ["Moving between pages of the site", "internal", "Found automatically"]
+];
+function getChannelsSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  getEventsSheet();
-  let sh = ss.getSheetByName("sources");
-  if (!sh) sh = ss.insertSheet("sources");
+  let sh = ss.getSheetByName("channels");
+  if (!sh) sh = ss.insertSheet("channels");
   sh.clear();
-  sh.getRange("A1:F1").setValues([["source", "visits to the map", "people", "notes opened", "notes added", "responses"]]).setFontWeight("bold");
-  sh.getRange("A2").setFormula('=SORT(UNIQUE(FILTER(events!E2:E, events!E2:E<>"")))');
-  sh.getRange("B2").setFormula('=ARRAYFORMULA(IF(A2:A="",, COUNTIFS(events!E:E, A2:A, events!D:D, "page_view", events!G:G, "index.html")))');
-  sh.getRange("C2").setFormula('=MAP(A2:A, LAMBDA(s, IF(s="",, COUNTUNIQUE(FILTER(events!B:B, events!E:E=s)))))');
-  sh.getRange("D2").setFormula('=ARRAYFORMULA(IF(A2:A="",, COUNTIFS(events!E:E, A2:A, events!D:D, "note_open")))');
-  sh.getRange("E2").setFormula('=ARRAYFORMULA(IF(A2:A="",, COUNTIFS(notes!J:J, A2:A, notes!K:K, "")))');
-  sh.getRange("F2").setFormula('=ARRAYFORMULA(IF(A2:A="",, COUNTIFS(notes!J:J, A2:A, notes!K:K, "<>")))');
-  sh.getRange("H1").setValue("What the sources mean").setFontWeight("bold");
-  sh.getRange("H2:H6").setValues([["Your own codes (from the links tab or make-qr.html), e.g. poster-bushwick"],
-    ["instagram / tiktok / twitter / facebook / google: came from that site"], ["direct: typed the address, a bookmark, or a link sent in a chat app"],
-    ["internal: moved between pages of the site"], ["ref-…: came from another website"]]);
-  sh.setFrozenRows(1);
-  sh.setColumnWidth(1, 200); sh.setColumnWidth(8, 420);
+  sh.getRange(1, 1, 1, 3).setValues([["channel", "id", "group"]]).setFontWeight("bold");
+  sh.getRange(2, 1, CHANNELS.length, 3).setValues(CHANNELS);
+  sh.hideSheet();
   return sh;
 }
 
-// ---------- "links" tab: make a tracked link + QR for each place you share the site ----------
-// Type a short name in column A (e.g. poster-bushwick, instagram-story). The link and QR fill in by themselves.
-// Visits from that link show up under the same name in the "sources" tab.
+// ---------- "sources" tab: where visitors came from ----------
+// Left: one row per code (e.g. poster-bushwick). Right: the same, added up per channel (all posters, all IG stories…).
+// Counted live from the events and notes tabs. Read-only.
+function getSourcesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  getEventsSheet(); getChannelsSheet();
+  let sh = ss.getSheetByName("sources");
+  if (!sh) sh = ss.insertSheet("sources");
+  sh.clear();
+  sh.getRange("A1:G1").setValues([["source code", "channel", "visits to the map", "people", "notes opened", "notes added", "responses"]]).setFontWeight("bold");
+  sh.getRange("A2").setFormula('=SORT(UNIQUE(FILTER(events!E2:E, events!E2:E<>"")))');
+  sh.getRange("B2").setFormula('=ARRAYFORMULA(IF(A2:A="",, IFERROR(VLOOKUP(REGEXEXTRACT(A2:A, "^[^-]+"), {channels!B2:B, channels!A2:A}, 2, FALSE), REGEXEXTRACT(A2:A, "^[^-]+"))))');
+  sh.getRange("C2").setFormula('=ARRAYFORMULA(IF(A2:A="",, COUNTIFS(events!E:E, A2:A, events!D:D, "page_view", events!G:G, "index.html")))');
+  sh.getRange("D2").setFormula('=MAP(A2:A, LAMBDA(s, IF(s="",, COUNTUNIQUE(FILTER(events!B:B, events!E:E=s)))))');
+  sh.getRange("E2").setFormula('=ARRAYFORMULA(IF(A2:A="",, COUNTIFS(events!E:E, A2:A, events!D:D, "note_open")))');
+  sh.getRange("F2").setFormula('=ARRAYFORMULA(IF(A2:A="",, COUNTIFS(notes!J:J, A2:A, notes!K:K, "")))');
+  sh.getRange("G2").setFormula('=ARRAYFORMULA(IF(A2:A="",, COUNTIFS(notes!J:J, A2:A, notes!K:K, "<>")))');
+  sh.getRange("I1").setFormula('=QUERY(B1:G, "select B, sum(C), sum(D), sum(E), sum(F), sum(G) where B is not null group by B order by sum(C) desc ' +
+    'label B \'per channel\', sum(C) \'visits\', sum(D) \'people\', sum(E) \'notes opened\', sum(F) \'notes added\', sum(G) \'responses\'", 1)');
+  sh.getRange("I1:N1").setFontWeight("bold");
+  sh.setFrozenRows(1);
+  sh.setColumnWidth(1, 200); sh.setColumnWidth(2, 240); sh.setColumnWidth(9, 240);
+  return sh;
+}
+
+// ---------- "links" tab: a tracked link + QR for every place you share the site ----------
+// Pick the channel, type a name if you like (e.g. bushwick), pick where it opens. The code, link and QR fill in.
+// Visits from it show up under the same code in "sources". Made once; your rows are never wiped.
 function getLinksSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  getChannelsSheet();
   let sh = ss.getSheetByName("links");
+  if (sh && sh.getRange("A1").getValue() === "channel (pick)") return sh;      // already set up: keep her rows
   if (!sh) sh = ss.insertSheet("links");
   sh.clear();
-  sh.getRange("A1:C1").setValues([["name (type here)", "link to share", "QR code"]]).setFontWeight("bold");
-  sh.getRange("A2:A4").setValues([["poster-parsons"], ["instagram-story"], ["flyer-bushwick"]]);
-  const base = "https://aiyazhumagaliyeva.github.io/common-ground/?src=";
-  sh.getRange("B2").setFormula('=ARRAYFORMULA(IF(A2:A="",, "' + base + '" & LOWER(SUBSTITUTE(TRIM(A2:A), " ", "-"))))');
-  sh.getRange("C2").setFormula('=ARRAYFORMULA(IF(B2:B="",, IMAGE("https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=" & ENCODEURL(B2:B))))');
+  sh.getRange("A1:F1").setValues([["channel (pick)", "name or place (optional)", "opens", "code", "link to share", "QR code"]]).setFontWeight("bold");
+  const channelsOnly = CHANNELS.filter(c => c[2] !== "Found automatically").map(c => c[0]);
+  sh.getRange("A2:A200").setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(channelsOnly, true).build());
+  sh.getRange("C2:C200").setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(["the map", "the camera"], true).build());
+  sh.getRange("A2:C4").setValues([["Poster (QR on the street)", "bushwick", "the map"], ["Instagram story", "", "the map"], ["Event, exhibition or open studio", "thesis show", "the camera"]]);
+  const base = "https://aiyazhumagaliyeva.github.io/common-ground/";
+  sh.getRange("D2").setFormula('=ARRAYFORMULA(IF(A2:A="",, IFERROR(VLOOKUP(A2:A, channels!A2:B, 2, FALSE), "other") & ' +
+    'IF(B2:B="", "", "-" & LOWER(REGEXREPLACE(REGEXREPLACE(TRIM(B2:B), "[^A-Za-z0-9]+", "-"), "^-|-$", "")))))');
+  sh.getRange("E2").setFormula('=ARRAYFORMULA(IF(D2:D="",, "' + base + '" & IF(C2:C="the camera", "phone.html", "") & "?src=" & D2:D))');
+  sh.getRange("F2").setFormula('=ARRAYFORMULA(IF(E2:E="",, IMAGE("https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=8&data=" & ENCODEURL(E2:E))))');
   sh.setFrozenRows(1);
-  sh.setColumnWidth(1, 200); sh.setColumnWidth(2, 460); sh.setColumnWidth(3, 130);
-  sh.setRowHeights(2, 50, 120);
-  sh.getRange("E1").setValue("For printing, make-qr.html makes the same link as a styled QR (your Figma look).");
+  sh.setColumnWidth(1, 260); sh.setColumnWidth(2, 180); sh.setColumnWidth(3, 100); sh.setColumnWidth(4, 200); sh.setColumnWidth(5, 420); sh.setColumnWidth(6, 130);
+  sh.setRowHeights(2, 199, 120);
+  sh.getRange("H1").setValue("For printing, make-qr.html makes the same code in your styled QR.");
   return sh;
 }
 
 // Run once from the editor (select "setup" → Run).
-function setup() { getSheet(); getEventsSheet(); getResponsesSheet(); getSourcesSheet(); getLinksSheet(); }
+function setup() { getSheet(); getEventsSheet(); getResponsesSheet(); getChannelsSheet(); getSourcesSheet(); getLinksSheet(); }

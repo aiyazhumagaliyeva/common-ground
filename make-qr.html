@@ -52,21 +52,10 @@
     </div>
 
     <label for="type">Where will people see it?</label>
-    <select id="type">
-      <option value="poster">Poster (QR on the street)</option>
-      <option value="tiktok">TikTok</option>
-      <option value="instagram-reel">Instagram reel</option>
-      <option value="instagram-story">Instagram story</option>
-      <option value="instagram-bio">Instagram bio</option>
-      <option value="share">Sent in a chat (DM, text, WhatsApp…)</option>
-      <option value="website">Another website (portfolio…)</option>
-      <option value="event">Event / exhibition</option>
-      <option value="other">Other</option>
-      <option value="none">No tag (plain link)</option>
-    </select>
+    <select id="type"></select>   <!-- filled from js/channels.js (same list as the Sheet) -->
 
     <label for="place">Name or area (optional)</label>
-    <input id="place" placeholder="e.g. bushwick, parsons-lobby, reel-01">
+    <input id="place" placeholder="e.g. bushwick, parsons-lobby, nov-12">
     <p class="hint">Short and lowercase works best. For posters, use the neighborhood or spot.</p>
 
     <label for="target">Where should it open?</label>
@@ -140,6 +129,15 @@
   import { drawQR, QR_STYLE } from './js/qr.js';
   const $ = id => document.getElementById(id);
   import { CONFIG } from './js/config.js';
+  import { CHANNELS } from './js/channels.js';
+  // the "Where will people see it?" list, grouped (same list as the Sheet's links tab)
+  {
+    const groups = {};
+    CHANNELS.forEach(c => (groups[c.group] = groups[c.group] || []).push(c));
+    $("type").innerHTML = Object.entries(groups).map(([g, list]) =>
+      `<optgroup label="${g}">` + list.map(c => `<option value="${c.id}">${c.label}</option>`).join("") + "</optgroup>").join("") +
+      `<option value="none">No tag (plain link)</option>`;
+  }
   // always the real website (not 127.0.0.1 from Go Live), so phones can open it
   const BASE = CONFIG.PHONE_URL.replace(/phone\.html$/, "");
 
