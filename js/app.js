@@ -171,6 +171,14 @@ graph.cameraPosition({ x: 0, y: 0, z: CONFIG.MAX_ZOOM * 1.8 });    // intro star
 const controls = graph.controls();
 controls.zoomToCursor = CONFIG.ZOOM_TO_MOUSE;   // false = zoom toward the middle, so the map stays centered
 controls.screenSpacePanning = true;
+// laptop: click and drag MOVES the map (shifts the center); two fingers on the trackpad turn it (see below);
+// right-click and drag also turns it. Phones keep one finger = turn, two fingers = pinch zoom / move.
+controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+// don't let the center wander off into empty space: keep it inside the cloud
+controls.addEventListener("change", () => {
+  const t = controls.target, max = CONFIG.MAP_RADIUS * 1.2, d = t.length();
+  if (d > max) { const back = t.clone().multiplyScalar(max / d).sub(t); t.add(back); graph.camera().position.add(back); }
+});
 controls.zoomSpeed = CONFIG.ZOOM_SPEED;
 controls.minDistance = 15;          // how close you can get to a note
 controls.maxDistance = 1200;
@@ -320,12 +328,13 @@ function fitCamera(ms = 1200) {
 // still turns around its own center afterwards (it never becomes the clicked note).
 function flyTo(node, ms = 1500) {
   const dist = CONFIG.NOTE_SIZE * 4;                     // how close it flies
-  let dir = new THREE.Vector3(node.tx, node.ty, node.tz);
-  const r = dir.length();
-  if (r < 1) dir = graph.camera().position.clone();      // a note right at the center: come from where you are
+  const c = controls.target.clone();                     // the current center (moved by click and drag, or the start)
+  const n = new THREE.Vector3(node.tx, node.ty, node.tz);
+  let dir = n.clone().sub(c);
+  if (dir.length() < 1) dir = graph.camera().position.clone().sub(c);   // the note is the center: come from where you are
   dir.normalize();
-  const p = dir.multiplyScalar(r + dist);
-  graph.cameraPosition({ x: p.x, y: p.y, z: p.z }, { x: 0, y: 0, z: 0 }, ms);
+  const p = n.add(dir.multiplyScalar(dist));             // just in front of the note, on the line from the center
+  graph.cameraPosition({ x: p.x, y: p.y, z: p.z }, { x: c.x, y: c.y, z: c.z }, ms);
 }
 
 // ---- click a note: the camera flies close, then the note view opens ----
@@ -350,8 +359,40 @@ function closeNote() {
   hideNoteView();
   setTimeout(() => { if (!selected) controls.autoRotate = CONFIG.DRIFT_SPEED > 0; }, 500);   // after the note is back on the map
 }
-graph.onNodeClick(openNote);
-graph.onBackgroundClick(closeNote);
+// ---- clicking notes (our own, more reliable than the library's) ----
+// The library counted a click only if the mouse didn't move at all (a hand on a trackpad always moves 1–2 px),
+// and its invisible shadow margin around each note caught clicks meant for the note behind.
+// Here: a press-and-release that moves less than 8 px (12 on a phone) and lasts under 0.7 s is a click.
+// It opens the note whose PAPER is under the pointer, the nearest one first. Tiny far-away notes get
+// a few px of extra room, but only where no paper is hit.
+graph.onNodeClick(() => {}).onBackgroundClick(() => {});
+function noteAt(x, y) {
+  const cam = graph.camera(), v = new THREE.Vector3();
+  const hit = (n, extra) => {
+    if (!n.__note || !n.__note.visible || n.__arriving || !n.__note.material.opacity) return false;
+    const s = noteOnScreen(n), half = s.size / 2 + extra;     // noteOnScreen gives the paper's size (not the shadow margin)
+    const dx = x - s.x, dy = y - s.y, c = Math.cos(-s.rot), sn = Math.sin(-s.rot);
+    return Math.abs(dx * c - dy * sn) <= half && Math.abs(dx * sn + dy * c) <= half;
+  };
+  const inFront = n => { n.__note.getWorldPosition(v); return v.clone().project(cam).z < 1; };
+  const dist = n => { n.__note.getWorldPosition(v); return v.distanceTo(cam.position); };
+  for (const extra of [0, 6]) {
+    const found = notes.filter(n => hit(n, extra) && inFront(n)).sort((a, b) => dist(a) - dist(b))[0];
+    if (found) return found;
+  }
+  return null;
+}
+let press = null;
+$("map").addEventListener("pointerdown", e => {          // decide at the press what is under the pointer (what you aimed at)
+  press = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, button: e.button, note: e.button === 0 ? noteAt(e.clientX, e.clientY) : null };
+}, true);
+$("map").addEventListener("pointerup", e => {
+  const p = press; press = null;
+  if (!p || p.id !== e.pointerId || p.button !== 0) return;
+  const moved = Math.hypot(e.clientX - p.x, e.clientY - p.y), limit = e.pointerType === "mouse" ? 8 : 12;
+  if (moved > limit || performance.now() - p.t > 700) return;       // that was a drag (moving / turning), not a click
+  p.note ? openNote(p.note) : closeNote();
+});
 
 // research: which notes people stop on (hovered at least 1 second). Clarity can't see inside the 3D map,
 // so this goes to the events tab (and to Clarity as an event, to filter recordings by it)
@@ -379,7 +420,7 @@ async function start() {
       const res = await fetch(CONFIG.SERVER_URL + "?action=approved");
       const saved = await res.json();
       saved.filter(s => !CONFIG.PHOTO_NOTES_ONLY || s.image).forEach(s => {
-        if (s.replyTo) { (responsesFor[s.replyTo] = responsesFor[s.replyTo] || []).push({ text: s.text, image: s.image }); return; }
+        if (s.replyTo) { (responsesFor[s.replyTo] = responsesFor[s.replyTo] || []).push({ id: "s" + s.id, replyTo: s.replyTo, text: s.text, image: s.image }); return; }
         notes.push({
           id: "s" + s.id, text: s.text, image: s.image || null, color: s.color,
           allowReplies: s.allowReplies, group: -1, fx: rnd(), fy: rnd(), fz: rnd()
@@ -537,14 +578,15 @@ async function showMyNote() {
   if (!data || Date.now() - (data.t || 0) > 10 * 60 * 1000) return;   // only right after sending
   await wait(2800);                            // let the intro finish first
   if (q.has("mine")) { arrive(data); return; }
-  const n = notes.find(x => x.id === data.replyTo);
+  const n = notes.find(x => x.id === rootNoteId(data.replyTo));
   if (!n) return;
   openNote(n);
   await wait(1300);
   if (viewNote !== n) return;
-  (responsesFor[n.id] = responsesFor[n.id] || []).push({ text: data.text, image: data.image, pending: true });
+  const mine = { id: data.id ? "s" + data.id : "r" + Date.now(), replyTo: data.replyTo, text: data.text, image: data.image, pending: true };
+  (responsesFor[data.replyTo] = responsesFor[data.replyTo] || []).push(mine);
   addResponseBadges(n);
-  drawResponses(n, true);
+  drawResponses(n, mine);
 }
 
 // ============================================================
@@ -617,7 +659,7 @@ const touch = matchMedia("(pointer: coarse)").matches;
 // every step's text sits in the same spot, bottom right: its bottom edge lines up with the bottom of the menu pill
 const TOUR_TEXT_AT = [1010, 912];
 const TOUR = [
-  { id: "rotate", phone: "Drag with one finger to rotate the map", text: "Slide two fingers on the trackpad to rotate the map",
+  { id: "rotate", phone: "Drag with one finger to rotate the map", text: "Slide two fingers on the trackpad to rotate the map. Click and drag to move around.",
     from: [671, 532], to: [990, 579], textAt: TOUR_TEXT_AT },
   { id: "zoom", phone: "Pinch with two fingers to zoom in or zoom out", text: "Pinch with two fingers on the trackpad to zoom in or zoom out",
     image: "illustrations/zoom.png", textAt: TOUR_TEXT_AT, imageAt: [955, 713, 409, 221] },   // the drawing sits above the text
@@ -835,8 +877,10 @@ if (!toured && !new URLSearchParams(location.search).has("mine")) {
 //  "Respond with a photo" moves it left and shows a QR card (flow 2).
 //  A response sent from a phone lands on top of the note (flow 3).
 // ============================================================
-// where responses sit around the note (Figma placeholder positions, 1512 × 982 frame)
-const RESPONSE_SLOTS = [[906, 615], [1020, 743], [381, 251], [270, 383], [122, 307], [223, 585], [906, 403], [1066, 527], [424, 615]];
+// where response threads sit AROUND the note (1512 × 982 frame, each 176 × 175, overlapping the note's edge a little,
+// never each other): right-bottom first, then left, right-top, left-bottom, then an outer ring
+const RESPONSE_SLOTS = [[906, 600], [430, 400], [906, 330], [400, 610], [1100, 470], [220, 470], [1090, 690], [214, 700]];
+const THREAD_MAX = 3;          // a thread: a response, a response to it, a response to that (stacked on top of each other)
 let viewNote = null, respondTimer = null, closeRespondLive = null;
 
 // where a note is on the screen right now (centre, size in px, tilt), from its 3D position
@@ -905,30 +949,55 @@ function hideNoteView() {
     img.style.transition = "";
   };
 }
-const PHONE_SLOTS = [[50, 52], [-8, 56], [56, -10], [-10, -8], [22, 62], [60, 22], [-12, 24], [24, -14], [36, 40]];
+// phones (in vw, from the note's top-left; the note is 72vw): beside the note, clear of the label above
+// and the button below — right-bottom first, like the laptop
+const PHONE_SLOTS = [[60, 40], [-12, 4], [60, 4], [-12, 40], [24, 44]];
 const phoneView = () => matchMedia("(max-width: 700px)").matches;
-function drawResponses(n, animateLast = false) {
+
+// ---- threads ----
+// responsesFor[id] = the answers to a note OR to a response. A note's threads: each direct response,
+// followed by the answer to it, and the answer to that (THREAD_MAX in total).
+function threadsOf(n) {
+  return (responsesFor[n.id] || []).map(r => {
+    const t = [r];
+    while (t.length < THREAD_MAX && (responsesFor[t[t.length - 1].id] || []).length) t.push(responsesFor[t[t.length - 1].id][0]);
+    return t;
+  });
+}
+function findResponse(id) { for (const k in responsesFor) { const r = responsesFor[k].find(x => x.id === id); if (r) return r; } return null; }
+function rootNoteId(id) { let r, guard = 0; while ((r = findResponse(id)) && guard++ < 10) id = r.replyTo; return id; }
+// "note" or "thread-layer" (e.g. "0-1" = first thread, the response to the response)
+function itemOf(n, key) { if (key === "note") return n; const [i, j] = key.split("-").map(Number); return (threadsOf(n)[i] || [])[j] || null; }
+function itemImage(n, key) { const o = itemOf(n, key); return o ? o.image : ""; }
+
+function drawResponses(n, landing = null) {
   resetFocus();
-  const box = $("nvResponses"), list = responsesFor[n.id] || [];
+  const box = $("nvResponses");
   box.innerHTML = "";
-  list.slice(0, RESPONSE_SLOTS.length).forEach((r, i) => {
-    const el = document.createElement(r.image ? "img" : "div");
-    el.className = "nvResp" + (animateLast && i === list.length - 1 ? " landing" : "");
-    if (r.image) { el.src = r.image; el.alt = r.text || "A response"; }
-    if (phoneView()) {
-      const [x, y] = PHONE_SLOTS[i % PHONE_SLOTS.length];
-      el.style.left = `calc(14vw + ${x}vw)`;
-      el.style.top = `calc(var(--nvTop) + ${y}vw)`;
-    } else {
-      el.style.left = `calc(${RESPONSE_SLOTS[i][0]} * var(--k))`;
-      el.style.top = `calc(${RESPONSE_SLOTS[i][1]} * var(--k))`;
-    }
-    if (r.image) {                                            // click a response: see it up close
-      el.dataset.item = i;
-      el.classList.add("canFocus");
-      el.addEventListener("click", e => { e.stopPropagation(); focusItem(el); });
-    }
-    box.appendChild(el);
+  const slots = phoneView() ? PHONE_SLOTS : RESPONSE_SLOTS;
+  threadsOf(n).slice(0, slots.length).forEach((thread, i) => {
+    thread.forEach((r, j) => {                                // later answers lie on top, a little lower and turned
+      const el = document.createElement(r.image ? "img" : "div");
+      el.className = "nvResp" + (landing && r === landing ? " landing" : "");
+      if (r.image) { el.src = r.image; el.alt = r.text || "A response"; }
+      const turn = j === 0 ? 0 : (j % 2 ? 3 : -2);
+      if (phoneView()) {
+        const [x, y] = PHONE_SLOTS[i];
+        el.style.left = `calc(14vw + ${x}vw)`;
+        el.style.top = `calc(var(--nvTop) + ${y + j * 4}vw)`;
+      } else {
+        el.style.left = `calc(${RESPONSE_SLOTS[i][0]} * var(--k))`;
+        el.style.top = `calc(${RESPONSE_SLOTS[i][1] + j * 18} * var(--k))`;
+      }
+      el.style.rotate = turn + "deg";
+      el.style.zIndex = 2 + j;
+      if (r.image) {                                          // click a response: see it up close
+        el.dataset.item = i + "-" + j;
+        el.classList.add("canFocus");
+        el.addEventListener("click", e => { e.stopPropagation(); focusItem(el); });
+      }
+      box.appendChild(el);
+    });
   });
   bigItem = "note";
 }
@@ -936,12 +1005,32 @@ function drawResponses(n, animateLast = false) {
 // ---- see a response up close ----
 // Click a response: it grows into the note's big spot and the note shrinks into the response's spot.
 // Click the small note (or another response) to switch again.
-let bigItem = "note";              // what is big right now: "note" or the number of a response
-function itemImage(n, item) { return item === "note" ? n.image : (responsesFor[n.id] || [])[item].image; }
+let bigItem = "note";              // what is big right now: "note" or "thread-layer"
+// label + button for what is big: the note ("Open to responses") or a response ("Response 2 of 3");
+// a thread takes answers until it has THREAD_MAX
+function showItemControls(n) {
+  if (bigItem === "note") {
+    $("nvLabel").textContent = "Open to responses";
+    $("nvLabel").hidden = $("nvRespond").hidden = !n.allowReplies;
+    $("nvImg").alt = n.text;
+    return;
+  }
+  const t = threadsOf(n)[+bigItem.split("-")[0]] || [], j = +bigItem.split("-")[1];
+  $("nvLabel").textContent = "Response" + (t.length > 1 ? ` ${j + 1} of ${t.length}` : "");
+  $("nvLabel").hidden = false;
+  $("nvRespond").hidden = !n.allowReplies || t.length >= THREAD_MAX;
+  $("nvImg").alt = (t[j] && t[j].text) || "A response";
+}
+// what a new response answers: the note, or (while a response is big) the last answer in that thread
+function replyTarget(n) {
+  if (bigItem === "note") return n.id;
+  const t = threadsOf(n)[+bigItem.split("-")[0]] || [];
+  return t.length ? t[t.length - 1].id : n.id;
+}
 function focusItem(el) {
   const n = viewNote;
   if (!n || !$("nvCard").hidden) return;
-  const big = $("nvImg"), was = bigItem, next = el.dataset.item === "note" ? "note" : +el.dataset.item;
+  const big = $("nvImg"), was = bigItem, next = el.dataset.item;
   const a = big.getBoundingClientRect(), b = el.getBoundingClientRect();
   // swap pictures, then animate each one from where the other was (so they trade places)
   big.src = itemImage(n, next) || "";
@@ -951,13 +1040,9 @@ function focusItem(el) {
   const fromRect = (to, from) => `translate(${from.left + from.width / 2 - (to.left + to.width / 2)}px, ${from.top + from.height / 2 - (to.top + to.height / 2)}px) scale(${from.width / to.width}, ${from.height / to.height})`;
   const ease = { duration: 500, easing: "cubic-bezier(.2,.75,.2,1)" };
   big.animate([{ transform: fromRect(a, b) }, { transform: "none" }], ease);
-  el.animate([{ transform: fromRect(b, a), zIndex: 3 }, { transform: "none", zIndex: 3 }], ease);
+  el.animate([{ transform: fromRect(b, a), zIndex: 9 }, { transform: "none", zIndex: 9 }], ease);
   el.classList.toggle("isNote", was === "note");
-  // label and button belong to the note: show them only while the note is big
-  $("nvLabel").textContent = next === "note" ? "Open to responses" : "Response";
-  $("nvLabel").hidden = next === "note" ? !n.allowReplies : false;
-  $("nvRespond").hidden = next === "note" ? !n.allowReplies : true;
-  $("nvImg").alt = next === "note" ? n.text : ((responsesFor[n.id] || [])[next].text || "A response");
+  showItemControls(n);
   track("response_view", { id: n.id, item: next });
 }
 // put the note back in the big spot at once (before closing or redrawing)
@@ -966,28 +1051,26 @@ function resetFocus() {
   const el = $("nvResponses").querySelector(".nvResp.isNote");
   if (el) { el.src = itemImage(viewNote, bigItem) || ""; el.dataset.item = bigItem; el.classList.remove("isNote"); }
   $("nvImg").src = viewNote.image || "";
-  $("nvImg").alt = viewNote.text;
-  $("nvLabel").textContent = "Open to responses";
-  $("nvLabel").hidden = $("nvRespond").hidden = !viewNote.allowReplies;
   bigItem = "note";
+  showItemControls(viewNote);
 }
 
 // "Click here to get a response QR code" → instructions + QR (flow 2)
 async function startRespond() {
   if (!viewNote) return;
-  const n = viewNote;
+  const n = viewNote, target = replyTarget(n);              // the note, or the last answer in the thread that is open
   if (isPhone() && $("tour").hidden) {
-    track("respond_open", { id: n.id, phone: true });
-    location.href = "phone.html?reply=" + encodeURIComponent(n.id) + (SOURCE !== "direct" ? "&src=" + encodeURIComponent(SOURCE) : "");
+    track("respond_open", { id: n.id, to: target, phone: true });
+    location.href = "phone.html?reply=" + encodeURIComponent(target) + (SOURCE !== "direct" ? "&src=" + encodeURIComponent(SOURCE) : "");
     return;
   }
   $("nvImg").style.transition = "";
   $("noteView").classList.add("responding");
   $("nvCard").hidden = false;
-  track("respond_open", { id: n.id });
+  track("respond_open", { id: n.id, to: target });
   if (!serverOn) return;
   const session = Math.random().toString(36).slice(2, 8);
-  const url = CONFIG.PHONE_URL + "?s=" + session + "&reply=" + encodeURIComponent(n.id);
+  const url = CONFIG.PHONE_URL + "?s=" + session + "&reply=" + encodeURIComponent(target);
   drawQR($("nvQr"), url);
   let done = false;
   const receive = data => {
@@ -996,11 +1079,12 @@ async function startRespond() {
     stopRespond();
     track("response_arrived", { flag: data.flag });
     if (data.flag && data.flag !== "ok") return;
-    (responsesFor[n.id] = responsesFor[n.id] || []).push({ text: data.text, image: data.image, pending: true });
+    const mine = { id: data.id ? "s" + data.id : "r" + Date.now(), replyTo: target, text: data.text, image: data.image, pending: true };
+    (responsesFor[target] = responsesFor[target] || []).push(mine);
     addResponseBadges(n);
-    $("noteView").classList.remove("responding");          // back to flow 3: the response lands on the corner
+    $("noteView").classList.remove("responding");          // back to flow 3: the response lands in its spot
     $("nvCard").hidden = true;
-    drawResponses(n, true);
+    drawResponses(n, mine);
   };
   if (liveOn()) {
     try {

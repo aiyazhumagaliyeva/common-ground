@@ -53,7 +53,7 @@ export const CONFIG = {
   // PREVIEW ONLY: white placeholder responses on these notes, to judge the layout. Set to {} before launch.
   RESPONSE_PREVIEW: {},
   TOUR_SHOW: "never",       // walkthrough shows by itself: "every-visit" (each new visit), "first-visit" (once per browser), "never" (only with ?)
-  DRIFT_SPEED: 0.15,      // slow turning of the map until someone touches it (0 = off)
+  DRIFT_SPEED: 0,         // slow turning of the map until someone touches it (0 = off; was 0.15)
   FLOAT: 0,               // how much the notes bob up and down (0 = still)
   ARRIVE_SCALE: 1.65,     // how big a new note is when it flies in
   ARRIVE_HOLD: 1200,      // ms you get to see a new note big before it shrinks to its place
