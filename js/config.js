@@ -42,7 +42,8 @@ export const CONFIG = {
   MAX_ZOOM: 400,          // farthest it starts, when there are many notes
   MAX_PIXEL_RATIO: 1.5,   // sharpness on Retina screens: 2 = sharpest but laggy, 1 = smoothest but softer
   ZOOM_TO_MOUSE: false,   // true = zoom toward the mouse (map can drift off-center); false = zoom toward the middle
-  ZOOM_SPEED: 1.4,        // how fast scrolling zooms (1 = normal)
+  ZOOM_SPEED: 1.4,        // how fast pinching zooms (1 = normal)
+  SCROLL_TURN: 1,         // how far one scroll turns the map (2 = twice as far, 0.5 = half)
   // ---- how a note looks as paper ----
   NOTE_TILT: 5,           // random tilt of each note, in degrees (0 = straight)
   NOTE_SHADOW: true,      // soft shadow under each note

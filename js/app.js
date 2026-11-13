@@ -150,7 +150,7 @@ function tween(ms, fn, ease = easeInOut) {
 // ============================================================
 //  GRAPH
 // ============================================================
-// "orbit" controls: drag = rotate, right-drag = move, scroll/pinch = zoom
+// "orbit" controls: drag = rotate, right-drag = move, pinch = zoom (scroll is handled below: it turns the map)
 const graph = ForceGraph3D({ controlType: "orbit" })($("map"));
 graph.width(window.innerWidth).height(window.innerHeight)
   .backgroundColor(CONFIG.BG_COLOR || "#ffffff")
@@ -177,6 +177,71 @@ controls.maxDistance = 1200;
 controls.autoRotate = true;           // slow drift until someone touches the map
 controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
 controls.addEventListener("start", () => (controls.autoRotate = false));
+
+// ---- scroll turns the map, pinch zooms (smoothly) ----
+// Like comfortmagazine.world: a light scroll (mouse wheel or two fingers on the trackpad) turns the map around.
+// Pinch on the trackpad (or Ctrl + mouse wheel) zooms. Drag still turns it too. Phones keep finger drag + pinch.
+let spin = 0;                 // turning speed left over from the last scrolls (slows down by itself)
+let zoomGoal = null;          // distance the camera is gliding to
+let camTweenUntil = 0;        // while the camera flies somewhere (open a note, walkthrough), scroll waits
+const camPos = graph.cameraPosition;
+graph.cameraPosition = function (pos, look, ms) {
+  if (pos) { spin = 0; zoomGoal = null; if (ms) camTweenUntil = performance.now() + ms; }
+  return camPos.apply(this, arguments);
+};
+function camDistance() { return graph.camera().position.distanceTo(controls.target); }
+function zoomBy(factor) {
+  const from = zoomGoal ?? camDistance();
+  zoomGoal = Math.min(controls.maxDistance, Math.max(controls.minDistance, from * factor));
+}
+function mapBusy() { return selected || !$("tour").hidden || performance.now() < camTweenUntil; }
+$("map").addEventListener("wheel", e => {
+  e.preventDefault();
+  e.stopPropagation();                                   // the orbit controls never see it: scroll no longer zooms
+  if (mapBusy()) return;
+  controls.autoRotate = false;
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;   // lines / pages → pixels
+  const dx = e.deltaX * unit, dy = e.deltaY * unit;
+  if (e.ctrlKey) {                                       // trackpad pinch (Chrome, Firefox) or Ctrl + wheel
+    zoomBy(Math.exp(Math.max(-30, Math.min(30, dy)) * 0.0051 * CONFIG.ZOOM_SPEED));
+    return;
+  }
+  const d = Math.abs(dx) > Math.abs(dy) ? dx : dy;       // sideways or up/down: both turn the map
+  spin += Math.max(-120, Math.min(120, d)) * CONFIG.SCROLL_TURN * 0.00007;
+  spin = Math.max(-0.08, Math.min(0.08, spin));
+}, { capture: true, passive: false });
+// Safari sends trackpad pinch as "gesture" events instead
+let gestureFrom = 1;
+$("map").addEventListener("gesturestart", e => { e.preventDefault(); gestureFrom = e.scale || 1; });
+$("map").addEventListener("gesturechange", e => {
+  e.preventDefault();
+  if (mapBusy()) return;
+  controls.autoRotate = false;
+  const s = e.scale || 1;
+  zoomBy(Math.pow(gestureFrom / s, CONFIG.ZOOM_SPEED));
+  gestureFrom = s;
+});
+// every frame: apply what is left of the turn and the zoom, easing out
+const _off = new THREE.Vector3(), _sph = new THREE.Spherical();
+function glide() {
+  const cam = graph.camera(), t = controls.target;
+  if (Math.abs(spin) > 0.00005 || zoomGoal !== null) {
+    _off.copy(cam.position).sub(t);
+    _sph.setFromVector3(_off);
+    _sph.theta -= spin;
+    spin *= 0.9;                                          // slows down smoothly after you stop scrolling
+    if (Math.abs(spin) <= 0.00005) spin = 0;
+    if (zoomGoal !== null) {
+      _sph.radius += (zoomGoal - _sph.radius) * 0.16;    // glide toward the zoom, no jumps
+      if (Math.abs(zoomGoal - _sph.radius) < 0.05) { _sph.radius = zoomGoal; zoomGoal = null; }
+    }
+    _off.setFromSpherical(_sph);
+    cam.position.copy(t).add(_off);
+    cam.lookAt(t);
+  }
+  requestAnimationFrame(glide);
+}
+requestAnimationFrame(glide);
 
 // ---- every frame: notes float gently and face you ----
 function tick(now) {
@@ -545,9 +610,9 @@ function setPos(n, v) {
 // ============================================================
 const touch = matchMedia("(pointer: coarse)").matches;
 const TOUR = [
-  { id: "rotate", phone: "Drag with one finger to rotate the map", text: "Press and drag the mouse to rotate the map",
+  { id: "rotate", phone: "Drag with one finger to rotate the map", text: "Scroll, or press and drag the mouse, to rotate the map",
     cursor: "move", from: [671, 532], to: [990, 579], textAt: [894, 837] },
-  { id: "zoom", phone: "Pinch with two fingers to zoom in or zoom out", text: "Slide with two fingers on the trackpad or roll the mouse roller to zoom in or zoom out",
+  { id: "zoom", phone: "Pinch with two fingers to zoom in or zoom out", text: "Pinch with two fingers on the trackpad to zoom in or zoom out",
     image: "illustrations/zoom.png", textAt: [955, 648], imageAt: [955, 713, 409, 221] },
   { id: "open", phone: "Tap a note to open it", text: "Click to open a note",
     cursor: "click", from: [688, 544], start: [930, 700], textAt: [894, 837], opensNote: true },
@@ -731,6 +796,7 @@ let closingNote = null;
 function stopViewAnimations() {
   [$("noteView"), $("nvImg"), $("nvLabel"), $("nvRespond"), $("nvResponses")].forEach(el => el.getAnimations().forEach(a => a.cancel()));
   if (closingNote) { closingNote.__note.visible = true; closingNote = null; }
+  $("noteView").style.pointerEvents = "";
 }
 
 function showNoteView(n) {
@@ -764,6 +830,7 @@ function hideNoteView() {
   v.classList.remove("responding");
   // the note shrinks back into its spot on the map; the veil lightens
   closingNote = n;
+  v.style.pointerEvents = "none";                              // while it shrinks away, clicks already reach the map
   [$("nvLabel"), $("nvRespond"), $("nvResponses")].forEach(el => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, fill: "forwards" }));
   v.animate([{ backgroundColor: VEIL }, { backgroundColor: NO_VEIL }], { duration: 450, fill: "forwards" });
   const a = img.animate([{ transform: "none" }, { transform: onMapTransform(n), boxShadow: "none" }],
@@ -849,4 +916,4 @@ $("noteView").addEventListener("click", () => {             // click the veil: b
   if (!$("nvCard").hidden) { stopRespond(); $("nvCard").hidden = true; $("noteView").classList.remove("responding"); return; }
   closeNote();
 });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("noteView").hidden && $("tour").hidden) closeNote(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && selected && $("tour").hidden) closeNote(); });   // also while it is still opening
