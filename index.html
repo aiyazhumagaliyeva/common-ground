@@ -47,6 +47,11 @@
     /* responses sit on top of the note */
     .nvResp { position: absolute; z-index: 2; width: calc(176 * var(--k)); height: calc(175 * var(--k)); background: #fff; object-fit: cover;
       box-shadow: 0 calc(6 * var(--k)) calc(18 * var(--k)) rgba(0,0,0,0.2); }
+    /* a thread: one box per spot, its layers stacked inside; drag it around (it stays on the note) */
+    .nvThread { position: absolute; z-index: 2; --step: calc(18 * var(--k)); width: calc(176 * var(--k));
+      height: calc(175 * var(--k) + var(--step) * (var(--layers) - 1)); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+    .nvThread.dragging { cursor: grabbing; z-index: 8; }
+    .nvThread .nvResp { position: absolute; }
     .nvResp.canFocus { cursor: pointer; transition: transform 0.2s ease; }      /* click a response to see it up close */
     @media (hover: hover) { .nvResp.canFocus:hover { transform: scale(1.04); } }
     .nvResp.landing { animation: respLand 0.7s cubic-bezier(.2,.9,.3,1.2); }
@@ -71,6 +76,7 @@
       #nvRespond { left: 14vw; width: 72vw; top: calc(var(--nvTop) + 72vw + 33px); transform: none; justify-content: center;
         padding: 12px 24px; font-size: 16px; }
       .nvResp { width: 26vw; height: 26vw; }
+      .nvThread { --step: 4vw; width: 26vw; height: calc(26vw + var(--step) * (var(--layers) - 1)); }
     }
     #tourCopy.phone { position: fixed; left: 24px; right: 24px; bottom: 110px; width: auto; z-index: 1; transform: none; }
     #tourCopy.phone #tourText { font-size: 18px; }

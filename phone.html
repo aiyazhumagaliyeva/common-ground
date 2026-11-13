@@ -543,7 +543,7 @@
           await new Promise(r => setTimeout(r, 950));
           // remember the note on this phone, so the map can show it before it's approved
           try {
-            if (REPLY) localStorage.setItem("cg:myReply", JSON.stringify({ replyTo: REPLY, text: full, image: thumb, t: Date.now() }));
+            if (REPLY) localStorage.setItem("cg:myReply", JSON.stringify({ id: saved.id || "", replyTo: REPLY, text: full, image: thumb, t: Date.now() }));
             else localStorage.setItem("cg:myNote", JSON.stringify({ id: saved.id || "", text: full, image: thumb, allowReplies, t: Date.now() }));
           } catch (e) {}
           $("sentPhoto").src = thumb;

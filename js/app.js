@@ -65,6 +65,8 @@ function paintNote(n) {
     g.fillStyle = "#222"; g.font = "32px Helvetica, Arial, sans-serif";
     wrapText(g, n.text, S - 60).slice(0, 10).forEach((l, i) => g.fillText(l, x + 30, y + 60 + i * 40));
   }
+  paintBadges(g, n);
+  n.__painted = true;
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   const m = n.__note.material;
@@ -84,35 +86,43 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 // ---- notes with responses: small notes stuck on the bottom-right corner (like Figma flow 3) ----
-const whiteTex = (() => {
-  const c = document.createElement("canvas"); c.width = c.height = 64;
-  const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, 64, 64);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
-})();
+// They are painted into the note's own picture (not separate 3D pieces), so they always stay with their note
+// and can never show up in front of another note.
 function addResponseBadges(n) {
   if (!n.__note) return;
-  const list = responsesFor[n.id] || [];
-  const want = Math.min(list.length, 2);
-  n.__badges = n.__badges || [];
-  while (n.__badges.length < want) {
-    const r = list[n.__badges.length];
-    const mat = new THREE.SpriteMaterial({ map: whiteTex, transparent: true, depthWrite: false });
-    if (r.image) new THREE.TextureLoader().load(r.image, t => { t.colorSpace = THREE.SRGBColorSpace; mat.map = t; mat.needsUpdate = true; });
-    const b = new THREE.Sprite(mat);
-    const i = n.__badges.length;
-    b.scale.setScalar(0.34);                                   // a third of the note
-    b.position.set(0.3 + i * 0.07, -0.3 - i * 0.05, 0.02 + i * 0.01);   // over the bottom-right corner
-    b.renderOrder = 2;
-    n.__note.add(b);
-    n.__badges.push(b);
-  }
+  const list = (responsesFor[n.id] || []).filter(r => r.image).slice(0, 2);
+  n.__badgeImgs = n.__badgeImgs || [];
+  let added = false;
+  list.forEach((r, i) => {
+    if (n.__badgeImgs[i] && n.__badgeImgs[i].__src === r.image) return;
+    const img = new Image();
+    img.__src = r.image;
+    img.onload = () => { if (n.__painted) paintNote(n); };   // wait for the note's own photo first
+    img.src = r.image;
+    n.__badgeImgs[i] = img;
+    added = true;
+  });
+  if (added && n.__painted) paintNote(n);
+}
+function paintBadges(g, n) {
+  (n.__badgeImgs || []).forEach((img, i) => {
+    if (!img.naturalWidth) return;
+    const size = LOOK * 0.34, cx = LOOK * (0.5 + 0.3 + i * 0.07), cy = LOOK * (0.5 + 0.3 + i * 0.05);   // over the bottom-right corner
+    g.save();
+    g.shadowColor = "rgba(0,0,0,0.25)"; g.shadowBlur = 14; g.shadowOffsetY = 5;
+    g.fillStyle = "#fff"; g.fillRect(cx - size / 2, cy - size / 2, size, size);
+    g.restore();
+    g.drawImage(img, cx - size / 2, cy - size / 2, size, size);
+  });
 }
 
 // the 3D object for one note (3d-force-graph calls this once per note)
 function makeNote(node) {
   const group = new THREE.Group();
   node.__group = group;
-  const note = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0 }));   // invisible until the photo loads
+  // invisible until the photo loads; drawn back-to-front without writing depth, so the see-through shadow border
+  // around one note never cuts a hole in the note behind it
+  const note = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0, depthWrite: false }));
   note.material.rotation = hashUnit(node.id, 7) * (CONFIG.NOTE_TILT * Math.PI / 180);         // a slight tilt
   note.scale.setScalar(CONFIG.NOTE_SIZE * LOOK / (LOOK - LOOK_PAD * 2));
   node.__note = note;
@@ -327,14 +337,21 @@ function fitCamera(ms = 1200) {
 // and keeps looking at the center: the note is in the middle of the screen, and the map
 // still turns around its own center afterwards (it never becomes the clicked note).
 function flyTo(node, ms = 1500) {
-  const dist = CONFIG.NOTE_SIZE * 4;                     // how close it flies
-  const c = controls.target.clone();                     // the current center (moved by click and drag, or the start)
+  // no spin: the camera keeps looking the same way and just slides toward the note until it is in the middle
+  const cam = graph.camera().position, t = controls.target;
+  const look = t.clone().sub(cam).normalize();
+  pivotDepth = cam.distanceTo(t);                        // how deep the turning point was (put back on close)
   const n = new THREE.Vector3(node.tx, node.ty, node.tz);
-  let dir = n.clone().sub(c);
-  if (dir.length() < 1) dir = graph.camera().position.clone().sub(c);   // the note is the center: come from where you are
-  dir.normalize();
-  const p = n.add(dir.multiplyScalar(dist));             // just in front of the note, on the line from the center
-  graph.cameraPosition({ x: p.x, y: p.y, z: p.z }, { x: c.x, y: c.y, z: c.z }, ms);
+  const p = n.clone().addScaledVector(look, -CONFIG.NOTE_SIZE * 4);
+  graph.cameraPosition({ x: p.x, y: p.y, z: p.z }, { x: n.x, y: n.y, z: n.z }, ms);
+}
+// after closing: turn around a point straight ahead at the old depth again (the view doesn't jump)
+let pivotDepth = 0;
+function restorePivot() {
+  if (!pivotDepth) return;
+  const cam = graph.camera().position, look = controls.target.clone().sub(cam).normalize();
+  controls.target.copy(cam.clone().addScaledVector(look, pivotDepth));
+  pivotDepth = 0;
 }
 
 // ---- click a note: the camera flies close, then the note view opens ----
@@ -357,6 +374,7 @@ function closeNote() {
   track("note_close", { id: n.id, seconds: Math.round((performance.now() - n.__openedAt) / 1000) });
   clearTimeout(openViewTimer);
   hideNoteView();
+  setTimeout(() => { if (!selected) restorePivot(); }, 1150);   // once the camera has arrived
   setTimeout(() => { if (!selected) controls.autoRotate = CONFIG.DRIFT_SPEED > 0; }, 500);   // after the note is back on the map
 }
 // ---- clicking notes (our own, more reliable than the library's) ----
@@ -413,13 +431,24 @@ function intro() {
   });
 }
 
+// the id of the note/response this phone sent a moment ago (?mine=1 / ?replied=1), so it isn't on the map twice
+function justSentId() {
+  const q = new URLSearchParams(location.search);
+  const key = q.has("mine") ? "cg:myNote" : q.has("replied") ? "cg:myReply" : null;
+  if (!key) return "";
+  try { const d = JSON.parse(localStorage.getItem(key)); return d && d.id && Date.now() - (d.t || 0) < 10 * 60 * 1000 ? String(d.id) : ""; }
+  catch (e) { return ""; }
+}
+const JUST_SENT = justSentId();                             // read once, before the address is cleaned up
+
 // ---- start: load saved notes, read meaning, arrange ----
 async function start() {
   if (serverOn) {
     try {
       const res = await fetch(CONFIG.SERVER_URL + "?action=approved");
       const saved = await res.json();
-      saved.filter(s => !CONFIG.PHOTO_NOTES_ONLY || s.image).forEach(s => {
+      const justSent = JUST_SENT;                            // this phone's own new note/response: it flies in after the intro
+      saved.filter(s => (!CONFIG.PHOTO_NOTES_ONLY || s.image) && !(justSent && String(s.id) === justSent)).forEach(s => {
         if (s.replyTo) { (responsesFor[s.replyTo] = responsesFor[s.replyTo] || []).push({ id: "s" + s.id, replyTo: s.replyTo, text: s.text, image: s.image }); return; }
         notes.push({
           id: "s" + s.id, text: s.text, image: s.image || null, color: s.color,
@@ -583,8 +612,9 @@ async function showMyNote() {
   openNote(n);
   await wait(1300);
   if (viewNote !== n) return;
-  const mine = { id: data.id ? "s" + data.id : "r" + Date.now(), replyTo: data.replyTo, text: data.text, image: data.image, pending: true };
-  (responsesFor[data.replyTo] = responsesFor[data.replyTo] || []).push(mine);
+  const id = data.id ? "s" + data.id : "r" + Date.now();
+  let mine = findResponse(id);                              // already loaded? use it: only one copy
+  if (!mine) { mine = { id, replyTo: data.replyTo, text: data.text, image: data.image, pending: true }; (responsesFor[data.replyTo] = responsesFor[data.replyTo] || []).push(mine); }
   addResponseBadges(n);
   drawResponses(n, mine);
 }
@@ -608,6 +638,8 @@ async function arrive(data) {
       node.vec = await Promise.race([embed([node.text]).then(v => v[0]), wait(8000).then(() => null)]);
     } catch (e) { console.error(e); }
   }
+  const twin = notes.findIndex(x => x.id === node.id);   // already on the map (same id)? replace it: only one copy
+  if (twin >= 0) notes.splice(twin, 1);
   notes.push(node);
   regroup();
   if (!node.vec) embed([node.text]).then(v => { node.vec = v[0]; regroup(); }).catch(() => {});                      // finds its spot; the others shift a little
@@ -970,36 +1002,73 @@ function rootNoteId(id) { let r, guard = 0; while ((r = findResponse(id)) && gua
 function itemOf(n, key) { if (key === "note") return n; const [i, j] = key.split("-").map(Number); return (threadsOf(n)[i] || [])[j] || null; }
 function itemImage(n, key) { const o = itemOf(n, key); return o ? o.image : ""; }
 
+// each thread is one box placed in its spot; its layers stack inside it (later answers a little lower, turned)
 function drawResponses(n, landing = null) {
   resetFocus();
-  const box = $("nvResponses");
+  const box = $("nvResponses"), phone = phoneView(), slots = phone ? PHONE_SLOTS : RESPONSE_SLOTS;
   box.innerHTML = "";
-  const slots = phoneView() ? PHONE_SLOTS : RESPONSE_SLOTS;
   threadsOf(n).slice(0, slots.length).forEach((thread, i) => {
-    thread.forEach((r, j) => {                                // later answers lie on top, a little lower and turned
+    const t = document.createElement("div");
+    t.className = "nvThread";
+    const [x, y] = slots[i];
+    t.style.left = phone ? `calc(14vw + ${x}vw)` : `calc(${x} * var(--k))`;
+    t.style.top = phone ? `calc(var(--nvTop) + ${y}vw)` : `calc(${y} * var(--k))`;
+    t.style.setProperty("--layers", thread.length);
+    const moved = (threadMoves[n.id] || {})[i];              // moved by hand earlier (until refresh)
+    if (moved) { t.style.left = moved[0] + "px"; t.style.top = moved[1] + "px"; }
+    thread.forEach((r, j) => {
       const el = document.createElement(r.image ? "img" : "div");
       el.className = "nvResp" + (landing && r === landing ? " landing" : "");
-      if (r.image) { el.src = r.image; el.alt = r.text || "A response"; }
-      const turn = j === 0 ? 0 : (j % 2 ? 3 : -2);
-      if (phoneView()) {
-        const [x, y] = PHONE_SLOTS[i];
-        el.style.left = `calc(14vw + ${x}vw)`;
-        el.style.top = `calc(var(--nvTop) + ${y + j * 4}vw)`;
-      } else {
-        el.style.left = `calc(${RESPONSE_SLOTS[i][0]} * var(--k))`;
-        el.style.top = `calc(${RESPONSE_SLOTS[i][1] + j * 18} * var(--k))`;
-      }
-      el.style.rotate = turn + "deg";
-      el.style.zIndex = 2 + j;
-      if (r.image) {                                          // click a response: see it up close
-        el.dataset.item = i + "-" + j;
-        el.classList.add("canFocus");
-        el.addEventListener("click", e => { e.stopPropagation(); focusItem(el); });
-      }
-      box.appendChild(el);
+      if (r.image) { el.src = r.image; el.alt = r.text || "A response"; el.draggable = false; }
+      el.style.left = "0";
+      el.style.top = `calc(var(--step) * ${j})`;
+      el.style.rotate = (j === 0 ? 0 : j % 2 ? 3 : -2) + "deg";
+      el.style.zIndex = 1 + j;
+      if (r.image) { el.dataset.item = i + "-" + j; el.classList.add("canFocus"); }
+      t.appendChild(el);
     });
+    makeThreadDraggable(t, n, i);
+    box.appendChild(t);
   });
   bigItem = "note";
+}
+
+// ---- move a thread by hand, so every response can be read ----
+// Drag a thread anywhere, as long as it still overlaps the note (at least 30 px). A short press is a click:
+// it opens that response up close. Where you put it is kept only in this browser, until the page is refreshed.
+const threadMoves = {};                                       // note id → { thread number: [left, top] px }
+function clampToNote(t, left, top) {
+  const img = $("nvImg"), m = 30, w = t.offsetWidth, h = t.offsetHeight;
+  const nl = img.offsetLeft, nt = img.offsetTop, nw = img.offsetWidth, nh = img.offsetHeight;
+  return [Math.min(nl + nw - m, Math.max(nl - w + m, left)), Math.min(nt + nh - m, Math.max(nt - h + m, top))];
+}
+function makeThreadDraggable(t, n, i) {
+  let start = null;
+  t.addEventListener("pointerdown", e => {
+    if (e.button !== 0 || !$("nvCard").hidden) return;
+    e.stopPropagation();
+    start = { x: e.clientX, y: e.clientY, l: t.offsetLeft, tp: t.offsetTop, moved: false, target: e.target, id: e.pointerId };
+    t.setPointerCapture(e.pointerId);
+  });
+  t.addEventListener("pointermove", e => {
+    if (!start || e.pointerId !== start.id) return;
+    const dx = e.clientX - start.x, dy = e.clientY - start.y;
+    if (!start.moved && Math.hypot(dx, dy) < 5) return;       // a little wobble is still a click
+    start.moved = true;
+    t.classList.add("dragging");
+    const [l, tp] = clampToNote(t, start.l + dx, start.tp + dy);
+    t.style.left = l + "px"; t.style.top = tp + "px";
+  });
+  const end = e => {
+    if (!start || e.pointerId !== start.id) return;
+    const s = start; start = null;
+    t.classList.remove("dragging");
+    if (s.moved) { (threadMoves[n.id] = threadMoves[n.id] || {})[i] = [t.offsetLeft, t.offsetTop]; track("response_move", { id: n.id }); return; }
+    if (e.type === "pointerup") { const el = s.target.closest(".nvResp.canFocus"); if (el) focusItem(el); }
+  };
+  t.addEventListener("pointerup", end);
+  t.addEventListener("pointercancel", end);
+  t.addEventListener("click", e => e.stopPropagation());     // never closes the note view
 }
 
 // ---- see a response up close ----
@@ -1079,8 +1148,9 @@ async function startRespond() {
     stopRespond();
     track("response_arrived", { flag: data.flag });
     if (data.flag && data.flag !== "ok") return;
-    const mine = { id: data.id ? "s" + data.id : "r" + Date.now(), replyTo: target, text: data.text, image: data.image, pending: true };
-    (responsesFor[target] = responsesFor[target] || []).push(mine);
+    const rid = data.id ? "s" + data.id : "r" + Date.now();
+    let mine = findResponse(rid);                           // never two of the same response
+    if (!mine) { mine = { id: rid, replyTo: target, text: data.text, image: data.image, pending: true }; (responsesFor[target] = responsesFor[target] || []).push(mine); }
     addResponseBadges(n);
     $("noteView").classList.remove("responding");          // back to flow 3: the response lands in its spot
     $("nvCard").hidden = true;
