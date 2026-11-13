@@ -54,7 +54,7 @@ export const CONFIG = {
   RESPONSE_PREVIEW: {},
   TOUR_SHOW: "never",       // walkthrough shows by itself: "every-visit" (each new visit), "first-visit" (once per browser), "never" (only with ?)
   DRIFT_SPEED: 0.15,      // slow turning of the map until someone touches it (0 = off)
-  FLOAT: 0.08,            // how much the notes bob up and down
+  FLOAT: 0,               // how much the notes bob up and down (0 = still)
   ARRIVE_SCALE: 1.65,     // how big a new note is when it flies in
   ARRIVE_HOLD: 1200,      // ms you get to see a new note big before it shrinks to its place
   PHOTO_NOTES_ONLY: true, // true = hide notes without a photo (typed test notes)
