@@ -90,7 +90,7 @@ function wrapText(ctx, text, maxWidth) {
 // and can never show up in front of another note.
 function addResponseBadges(n) {
   if (!n.__note) return;
-  const list = (responsesFor[n.id] || []).filter(r => r.image).slice(0, 2);
+  const list = (responsesFor[n.id] || []).filter(r => r.image).slice(0, BADGE_SPOTS.length);
   n.__badgeImgs = n.__badgeImgs || [];
   let added = false;
   list.forEach((r, i) => {
@@ -104,10 +104,13 @@ function addResponseBadges(n) {
   });
   if (added && n.__painted) paintNote(n);
 }
+// where each response sits on the small map note (share of the picture), like the open view: right-bottom first,
+// then left, right-top, left-bottom — spread out, never on top of each other
+const BADGE_SPOTS = [[0.8, 0.8], [0.2, 0.5], [0.8, 0.26], [0.21, 0.82]];
 function paintBadges(g, n) {
   (n.__badgeImgs || []).forEach((img, i) => {
-    if (!img.naturalWidth) return;
-    const size = LOOK * 0.34, cx = LOOK * (0.5 + 0.3 + i * 0.07), cy = LOOK * (0.5 + 0.3 + i * 0.05);   // over the bottom-right corner
+    if (!img.naturalWidth || !BADGE_SPOTS[i]) return;
+    const size = LOOK * 0.3, cx = LOOK * BADGE_SPOTS[i][0], cy = LOOK * BADGE_SPOTS[i][1];
     g.save();
     g.shadowColor = "rgba(0,0,0,0.25)"; g.shadowBlur = 14; g.shadowOffsetY = 5;
     g.fillStyle = "#fff"; g.fillRect(cx - size / 2, cy - size / 2, size, size);
