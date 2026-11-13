@@ -44,6 +44,7 @@ export const CONFIG = {
   ZOOM_TO_MOUSE: false,   // true = zoom toward the mouse (map can drift off-center); false = zoom toward the middle
   ZOOM_SPEED: 1.4,        // how fast pinching zooms (1 = normal)
   SCROLL_TURN: 1,         // how strongly scrolling turns the map (1 = same as comfortmagazine.world, 0.5 = half)
+  MOUSE_TURN: 1,          // how much moving the mouse turns the map (0 = off, 2 = twice as much)
   // ---- how a note looks as paper ----
   NOTE_TILT: 5,           // random tilt of each note, in degrees (0 = straight)
   NOTE_SHADOW: true,      // soft shadow under each note

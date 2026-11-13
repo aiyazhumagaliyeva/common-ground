@@ -88,18 +88,12 @@
     #tourImage[hidden] { display: none; }
     #tourCursor { position: absolute; width: calc(31 * var(--k)); height: auto; pointer-events: none; }
     #tourCursor.drag { animation: tourDrag 2.4s ease-in-out infinite; }
+    #tourCursor.move { animation: tourMove 2.4s ease-in-out infinite; }   /* laptop: the mouse just moves, no press */
+    @keyframes tourMove { 0%, 10% { transform: translate(0, 0); } 70%, 100% { transform: translate(var(--dx), var(--dy)); } }
     /* phones: hand drawings; the fingertip sits on the point */
     #tourCursor.hand { width: 96px; margin: -14px 0 0 -22px; }   /* your drawings as they are: black lines, white fill */
     @keyframes tourDrag { 0%, 12% { transform: translate(0, 0) scale(1); } 18% { transform: translate(0, 0) scale(0.88); }
       70% { transform: translate(var(--dx), var(--dy)) scale(0.88); } 78%, 100% { transform: translate(var(--dx), var(--dy)) scale(1); } }
-    body.touring #helpBtn { z-index: 7; }
-    /* the "?" button: 38 × 37, #EBEBEB at 80%, black outline, bottom right */
-    #helpBtn { all: unset; position: fixed; z-index: 3; right: max(24px, calc(56 * var(--k))); bottom: max(24px, calc(44 * var(--k)));
-      width: max(34px, calc(38 * var(--k))); height: max(33px, calc(37 * var(--k))); border-radius: 50px; cursor: pointer;
-      background: rgba(235, 235, 235, 0.8); border: 1px solid #000; display: grid; place-items: center; box-sizing: border-box; }
-    #helpBtn img { width: 100%; height: 100%; }
-    #helpBtn:focus-visible { outline: 2px solid #000; outline-offset: 3px; }
-    body.page-open #helpBtn { display: none; }
 
     #mapInfo:not(.problem) { display: none; }
 
@@ -115,22 +109,26 @@
        ============================================================ */
     :root { --k: min(calc(100vw / 1512), calc(100vh / 982)); }
 
-    /* ---------- NAV PILL (Figma: home-new) ---------- */
+    /* ---------- NAME + NAV PILL (Figma: home04-NEW) ---------- */
+    /* "Common Ground" alone at the top left (42 / 36, bold 24) */
+    #brandTop { position: fixed; z-index: 5; left: max(20px, calc(42 * var(--k))); top: max(16px, calc(36 * var(--k)));
+      font-family: Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: max(18px, calc(24 * var(--k)));
+      color: #000; text-decoration: none; white-space: nowrap; transition: top 0.45s ease; }
+    body.page-open #brandTop { top: -80px; }               /* slides away on pages */
+    /* the menu pill at the bottom middle (top 871 of 982, 41 tall → 70 from the bottom) */
     #nav {
       position: fixed; z-index: 5; left: 50%; transform: translateX(-50%);
-      top: max(16px, calc(56 * var(--k)));
+      bottom: max(16px, calc(70 * var(--k)));
       display: flex; align-items: center; gap: max(10px, calc(15 * var(--k)));
       padding: max(7px, calc(10 * var(--k))) max(20px, calc(30 * var(--k)));
-      border: 1px solid #000; border-radius: 40px;
+      border: 1px solid #000; border-radius: 20px;
       background: rgba(255, 255, 255, 0.1);         /* Figma: white 10% + Glass effect (js/glass.js) */
       backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
       font-family: Helvetica, Arial, sans-serif; font-size: max(13px, calc(16 * var(--k))); color: #000;
-      transition: top 0.45s ease;
+      transition: bottom 0.45s ease;
     }
-    body.page-open #nav { top: -80px; }                     /* slides away on pages */
-    #nav .brand { font-family: Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: max(16px, calc(20 * var(--k))); white-space: nowrap; }
+    body.page-open #nav { bottom: -80px; }                  /* slides away on pages */
     #nav .divider { width: 2px; height: max(14px, calc(19 * var(--k))); display: block; }
-    #nav .links { display: flex; align-items: center; gap: max(14px, calc(21 * var(--k))); }
     #nav button { all: unset; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 7px; }
     #nav button:hover { color: rgba(0, 0, 0, 0.7); }       /* hover = Figma variant 4/5/6 */
     #nav .camera { width: max(16px, calc(20 * var(--k))); height: auto; display: block; }
@@ -138,7 +136,7 @@
     #navAdd:hover .camera { display: none; }
     #navAdd:hover .camera.hover { display: block; }
 
-    /* ---------- FULL PAGES (Add a note, About, Contact) ---------- */
+    /* ---------- FULL PAGES (Add a note, About) ---------- */
     .page {
       position: fixed; inset: 0; z-index: 4; background: #fff;
       overflow-y: auto; font-family: Helvetica, Arial, sans-serif; color: #000;
@@ -196,7 +194,7 @@
     }
     body:has(#openCamera:not([hidden])) .qrCard .box { display: none; }
     /* after the QR is scanned the add page closes; this small pill says the note is coming */
-    #handoffPill { position: fixed; z-index: 5; left: 50%; bottom: max(24px, calc(44 * var(--k))); transform: translateX(-50%);
+    #handoffPill { position: fixed; z-index: 5; left: 50%; bottom: max(72px, calc(130 * var(--k)));   /* above the menu pill */ transform: translateX(-50%);
       display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-radius: 50px; background: rgba(255,255,255,0.9);
       box-shadow: 0 4px 18px rgba(0,0,0,0.15); font: 15px Helvetica, Arial, sans-serif; color: #111; white-space: nowrap; animation: stepIn .4s ease-out; }
     #handoffPill[hidden] { display: none; }
@@ -206,7 +204,7 @@
 
     /* ---------- ABOUT / CONTACT (Figma: about) ---------- */
     /* about-new: image + text sections */
-    @media (min-width: 901px) { #aboutPage, #contactPage { --k: calc(100vw / 1512); } }   /* scrolling pages: scale by width only */
+    @media (min-width: 901px) { #aboutPage { --k: calc(100vw / 1512); } }   /* scrolling pages: scale by width only */
     /* Figma "about": one 807px column, 35px between blocks, headings 24px centered, text 20px */
     .about { width: min(calc(807 * var(--k)), 90vw); margin: calc(61 * var(--k)) auto 0;
       padding-bottom: calc(160 * var(--k));            /* space after the last image */
@@ -219,9 +217,7 @@
     .about ol, .about ul { margin: 0; padding-left: 30px; }
     .about ol { margin-top: 1.2em; }
     .about .privacy { margin-top: 1.2em; font-size: max(13px, calc(15 * var(--k))); color: rgba(0,0,0,0.5); }
-    .about a, .contact a { color: inherit; }
-    .contact { width: min(calc(799 * var(--k)), 88vw); margin: calc(64 * var(--k)) auto; font-size: max(15px, calc(20 * var(--k))); line-height: normal; }
-    .contact p + p { margin-top: 1.2em; }
+    .about a { color: inherit; }
 
     /* ---------- PHONES / NARROW SCREENS ---------- */
     @media (max-width: 800px) {
@@ -240,7 +236,7 @@
     @media (max-width: 600px) {
       .desk { display: none !important; }
       .mob { display: revert; }
-      #nav { display: none; }
+      #nav, #brandTop { display: none; }
       .brand-phone, #phoneBar .brand, #phoneMenu .brand { font-family: Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 20px; color: #000; white-space: nowrap; }
       /* header: name left, menu icon right */
       #phoneBar { display: flex; position: fixed; z-index: 5; left: 26px; right: 33px; top: calc(30px + env(safe-area-inset-top, 0px));
@@ -267,7 +263,6 @@
       .about h2 + .text { margin-top: -10px; }                                         /* 20 between a heading and its text */
       .about p, .about li { font-size: 16px; line-height: 1.45; }   /* more air between lines: easier to read on a narrow screen */
       .about h2 { font-size: 18px; }
-      .contact { width: auto; margin: 20px 25px; font-size: 16px; line-height: 1.45; }
       /* add a note: one column of steps, "Submit a note" button at the bottom */
       .steps { width: 325px; max-width: calc(100vw - 48px); margin: 40px auto 0; grid-template-columns: 1fr; row-gap: 40px; padding-bottom: 140px; }
       .step .num { width: 34px; font-size: 20px; }
@@ -300,8 +295,8 @@
     </div>
     <nav class="items" aria-label="Menu">
       <button data-go="navAdd">Add a note</button>
+      <button data-go="navHow">How to navigate</button>
       <button data-go="navAbout">About</button>
-      <button data-go="navContact">Contact Us</button>
     </nav>
   </div>
 
@@ -327,20 +322,17 @@
       <div id="tourCopy"><p id="tourText"></p><p id="tourHint"></p><img id="tourImage" alt="" hidden></div>
     </div>
   </div>
-  <button type="button" id="helpBtn" aria-label="How to use Common Ground"><img src="icons/question.svg" alt=""></button>
-
+  <!-- Figma home04-NEW: name top left, menu pill at the bottom -->
+  <a class="brand" id="brandTop" href="">Common Ground</a>
   <nav id="nav">
-    <a class="brand" href="">Common Ground</a>
-    <img class="divider" src="icons/divider-thin.svg" alt="">
     <button id="navAdd">Add a note
       <img class="camera" src="icons/camera.svg" alt="">
       <img class="camera hover" src="icons/camera-hover.svg" alt="">
     </button>
     <img class="divider" src="icons/divider-thin.svg" alt="">
-    <div class="links">
-      <button id="navAbout">About</button>
-      <button id="navContact">Contact Us</button>
-    </div>
+    <button id="navHow">How to navigate</button>
+    <img class="divider" src="icons/divider-thin.svg" alt="">
+    <button id="navAbout">About</button>
   </nav>
 
   <!-- ---------- ADD A NOTE ---------- -->
@@ -460,16 +452,6 @@
         <p class="tight">I'm Aiya, a senior in Communication Design at Parsons School of Design, based in Brooklyn. Common Ground is part of my thesis, where I explore how people can connect through technology and what happens when personal, offline expression meets online data. I grew up practicing fine art, and I now work where design, code and people meet. I researched and designed this project in Figma and built it with HTML, CSS and JavaScript, using a 3D graph library and Claude Code (an AI coding tool).</p>
         <p class="tight">More of my work: <a href="https://aiyazhumagaliyeva.com" target="_blank" rel="noopener">aiyazhumagaliyeva.com</a></p>
       </div>
-    </div>
-  </section>
-
-  <!-- ---------- CONTACT (Figma: contact-new) ---------- -->
-  <section class="page" id="contactPage" aria-label="Contact Us">
-    <button class="back" data-close aria-label="Back to the board"><img src="icons/back.svg" alt=""></button>
-    <h1><span class="desk">Contact Us</span><span class="mob">Contact Common Ground</span></h1>
-    <div class="contact">
-      <p>You can find us on <a href="#" target="_blank" rel="noopener">Instagram</a>.</p>   <!-- add the Instagram link in href -->
-      <p>If you have any questions or want your note to be removed, you can <a href="mailto:">Email us</a> too.</p>   <!-- add your email after mailto: -->
     </div>
   </section>
 

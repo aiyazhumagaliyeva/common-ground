@@ -223,16 +223,37 @@ $("map").addEventListener("gesturechange", e => {
   zoomBy(Math.pow(gestureFrom / s, CONFIG.ZOOM_SPEED));
   gestureFrom = s;
 });
+// ---- moving the mouse turns the map gently (like comfortmagazine.world, but softer) ----
+// The map leans toward where the mouse is: mouse right → the map turns right, mouse down → it tilts down.
+// It holds still while the mouse is on a note (so the note doesn't run away from the click),
+// while you press/drag, while a note or the walkthrough is open. MOUSE_TURN in config: 0 = off.
+let mouseAim = null, aimNow = { x: 0, y: 0 }, mousePressed = false;
+$("map").addEventListener("pointermove", e => {
+  if (e.pointerType !== "mouse") return;                // phones and tablets: finger drag only
+  mouseAim = { x: e.clientX / innerWidth * 2 - 1, y: e.clientY / innerHeight * 2 - 1 };   // -1 … 1 from the middle
+});
+$("map").addEventListener("pointerdown", () => (mousePressed = true));
+window.addEventListener("pointerup", () => (mousePressed = false));
+document.addEventListener("mouseleave", () => (mouseAim = null));   // left the window: stay where it is
+function mouseLean() {                                   // how much to turn / tilt this frame because of the mouse
+  const k = CONFIG.MOUSE_TURN ?? 1;
+  if (!k || !mouseAim || mousePressed || hoverNote || mapBusy() || document.body.classList.contains("page-open")) return [0, 0];
+  const dx = (mouseAim.x - aimNow.x) * 0.05, dy = (mouseAim.y - aimNow.y) * 0.05;
+  aimNow.x += dx; aimNow.y += dy;
+  return [-dx * 0.6 * k, -dy * 0.25 * k];               // up to ~34° left/right and ~14° up/down from where you are
+}
+
 // every frame: apply part of what is left of the turn, tilt and zoom, easing out
 const TILT_MIN = Math.PI / 2 - 0.9, TILT_MAX = Math.PI / 2 + 0.9;
 const _off = new THREE.Vector3(), _sph = new THREE.Spherical();
 function glide() {
   const cam = graph.camera(), t = controls.target;
-  if (turnLeft || tiltLeft || zoomGoal !== null) {
+  const [leanTurn, leanTilt] = mouseLean();
+  if (turnLeft || tiltLeft || zoomGoal !== null || Math.abs(leanTurn) > 1e-5 || Math.abs(leanTilt) > 1e-5) {
     _off.copy(cam.position).sub(t);
     _sph.setFromVector3(_off);
-    const turn = turnLeft * 0.1, tilt = tiltLeft * 0.08;
-    turnLeft -= turn; tiltLeft -= tilt;
+    const turn = turnLeft * 0.1 + leanTurn, tilt = tiltLeft * 0.08 + leanTilt;
+    turnLeft -= turnLeft * 0.1; tiltLeft -= tiltLeft * 0.08;
     if (Math.abs(turnLeft) < 0.0002) turnLeft = 0;
     if (Math.abs(tiltLeft) < 0.0002) tiltLeft = 0;
     _sph.theta += turn;
@@ -461,7 +482,6 @@ $("menuClose").addEventListener("click", () => setMenu(false));
 document.querySelectorAll("#phoneMenu [data-go]").forEach(b => b.addEventListener("click", () => { setMenu(false); $(b.dataset.go).click(); }));
 $("optOut").addEventListener("click", () => { optOut(); $("optOut").outerHTML = "<span>Done, your visits aren’t counted.</span>"; });
 if (optedOut()) $("optOut").outerHTML = "<span>Your visits aren’t counted.</span>";
-$("navContact").addEventListener("click", () => { openPage("contactPage"); track("contact_open"); });
 document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeAll));
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeAll(); });
 
@@ -625,18 +645,29 @@ function setPos(n, v) {
 // ============================================================
 const touch = matchMedia("(pointer: coarse)").matches;
 const TOUR = [
-  { id: "rotate", phone: "Drag with one finger to rotate the map", text: "Scroll, or press and drag the mouse, to rotate the map",
-    cursor: "move", from: [671, 532], to: [990, 579], textAt: [894, 837] },
+  { id: "rotate", phone: "Drag with one finger to rotate the map", text: "Move the mouse to rotate the map",
+    cursor: "move", from: [671, 532], to: [990, 579], textAt: [894, 740] },   // above the menu pill (now at the bottom)
   { id: "zoom", phone: "Pinch with two fingers to zoom in or zoom out", text: "Pinch with two fingers on the trackpad to zoom in or zoom out",
     image: "illustrations/zoom.png", textAt: [955, 648], imageAt: [955, 713, 409, 221] },
   { id: "open", phone: "Tap a note to open it", text: "Click to open a note",
-    cursor: "click", from: [688, 544], start: [930, 700], textAt: [894, 837], opensNote: true },
+    cursor: "click", textAt: [60, 130], opensNote: true },   // top left: clear of the open note and its responses
+  // the next two only show when the walkthrough's note can have responses / has some
+  { id: "respond", phone: "Tap “Respond with a photo” to answer a note with your own photo",
+    text: "Click “Respond with a photo” to answer a note with your own photo",
+    cursor: "click", textAt: [60, 130], keepNote: true, level: 1, target: () => $("nvRespond") },
+  { id: "expand", phone: "Tap a small response to see it up close. Tap the small note to go back.",
+    text: "Click a small response to see it up close. Click the small note to go back.",
+    cursor: "click", textAt: [60, 130], keepNote: true, level: 2, target: () => $("nvResponses").querySelector(".canFocus") },
 ];
-let tourStep = -1, tourNote = null, tourTimer = null;
+let tourStep = -1, tourNote = null, tourTimer = null, activeTour = TOUR, tourLevel = 0;
 
+// what the walkthrough can show: 2 = a note with photo responses exists, 1 = a note open to responses, 0 = neither
+const noteLevel = n => !n.allowReplies ? 0 : (responsesFor[n.id] || []).some(r => r.image) ? 2 : 1;
 function startTour() {
   if (document.body.classList.contains("page-open")) closeAll();
   tourStep = -1;
+  tourLevel = Math.max(0, ...notes.filter(n => n.__group && !n.__arriving).map(noteLevel));
+  activeTour = TOUR.filter(st => !st.level || st.level <= tourLevel);
   const narrow = matchMedia("(max-width: 700px)").matches;
   (narrow ? $("tour") : $("tourStage")).appendChild($("tourCopy"));
   $("tourCopy").classList.toggle("phone", narrow);
@@ -661,9 +692,10 @@ function startZoomDemo() {
   zoomDemoTimer = setInterval(step, 2200);
 }
 function stopZoomDemo() {
-  if (!zoomDemoTimer) return;
+  if (!zoomDemoTimer) return false;
   clearInterval(zoomDemoTimer); zoomDemoTimer = null;
   graph.cameraPosition(zoomDemoFrom, controls.target, 600);
+  return true;
 }
 function endTour() {
   stopZoomDemo();
@@ -673,21 +705,36 @@ function endTour() {
   $("tour").classList.remove("clear");
   controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
   $("tour").hidden = true;
+  $("tourCopy").style.top = $("tourCopy").style.bottom = "";
   document.body.classList.remove("touring");
   try { localStorage.setItem("cg:toured", "1"); sessionStorage.setItem("cg:toured", "1"); } catch (e) {}
   track("tour_end", { step: tourStep });
 }
+// a point on the screen → the Figma artboard the cursor lives on
+function toStage(x, y) {
+  const k = $("tourStage").getBoundingClientRect().width / 1512 || 1;   // 1 Figma px on this screen
+  const stage = $("tourStage").getBoundingClientRect();
+  return [(x - stage.left) / k, (y - stage.top) / k];
+}
+// the walkthrough's note: one on screen near the middle that can show the most steps
+function pickTourNote() {
+  const ok = notes.filter(n => n.__group && !n.__arriving && noteLevel(n) >= tourLevel);
+  const at = n => graph.graph2ScreenCoords(n.x || 0, n.y || 0, n.z || 0);
+  const onScreen = ok.filter(n => { const c = at(n); return c.x > innerWidth * 0.2 && c.x < innerWidth * 0.8 && c.y > innerHeight * 0.2 && c.y < innerHeight * 0.75; });
+  const pool = onScreen.length ? onScreen : ok;
+  return pool.map(n => { const c = at(n); return [n, Math.hypot(c.x - innerWidth / 2, c.y - innerHeight / 2)]; }).sort((a, b) => a[1] - b[1])[0]?.[0] || null;
+}
 function nextTourStep() {
-  stopZoomDemo();
+  const zoomWasOn = stopZoomDemo();
   clearTimeout(tourTimer); clearInterval(tourTimer);
   if (demoAnim) { demoAnim.cancel(); demoAnim = null; }
-  if (tourNote) { closeNote(); tourNote = null; }
+  if (tourNote && !activeTour[tourStep + 1]?.keepNote) { closeNote(); tourNote = null; }
   tourStep++;
-  if (tourStep >= TOUR.length) return endTour();
-  const st = TOUR[tourStep], cur = $("tourCursor"), img = $("tourImage");
+  if (tourStep >= activeTour.length) return endTour();
+  const st = activeTour[tourStep], cur = $("tourCursor"), img = $("tourImage");
   const at = (el, x, y) => { el.style.left = `calc(${x} * var(--k))`; el.style.top = `calc(${y} * var(--k))`; };
   $("tourText").textContent = touch || isPhone() ? st.phone : st.text;
-  $("tourHint").textContent = `${touch || isPhone() ? "Tap" : "Click"} anywhere to continue · ${tourStep + 1} of ${TOUR.length}`;
+  $("tourHint").textContent = `${touch || isPhone() ? "Tap" : "Click"} anywhere to continue · ${tourStep + 1} of ${activeTour.length}`;
   if (!$("tourCopy").classList.contains("phone")) at($("tourCopy"), st.textAt[0], st.textAt[1]);
   const hand = touch || isPhone();
   // drawing (zoom step, laptop only: phones get the pinching hand instead)
@@ -697,38 +744,81 @@ function nextTourStep() {
     img.style.width = `calc(${st.imageAt[2]} * var(--k))`;
   }
   // the white cursor on a laptop; hand drawings on a phone (pointing finger, pinch, tap)
-  cur.hidden = !st.cursor && !(hand && st.id === "zoom");
+  cur.hidden = true;
   cur.className = hand ? "hand" : "";
   controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
-  if (hand && st.id === "zoom") { cur.src = "icons/hand-spread.png"; at(cur, 700, 470); }
-  if (st.cursor) {
-    cur.src = hand ? "icons/hand-point.png" : st.cursor === "click" ? "icons/cursor-click.svg" : "icons/cursor.svg";
+  if (hand && st.id === "zoom") { cur.hidden = false; cur.src = "icons/hand-spread.png"; at(cur, 700, 470); }
+  if (st.id === "rotate") {                                  // the cursor moves across while the map turns
+    cur.hidden = false;
+    cur.src = hand ? "icons/hand-point.png" : "icons/cursor.svg";
     at(cur, st.from[0], st.from[1]);
-    if (st.to) {                                   // rotate: the cursor drags across while the map turns
-      cur.style.setProperty("--dx", `calc(${st.to[0] - st.from[0]} * var(--k))`);
-      cur.style.setProperty("--dy", `calc(${st.to[1] - st.from[1]} * var(--k))`);
-      cur.className = hand ? "hand drag" : "drag";
-      controls.autoRotate = true;
-      controls.autoRotateSpeed = 3;
-    } else if (st.start) {                         // open / add: the cursor glides in, then clicks
-      clickDemo(cur, st);
-    }
+    cur.style.setProperty("--dx", `calc(${st.to[0] - st.from[0]} * var(--k))`);
+    cur.style.setProperty("--dy", `calc(${st.to[1] - st.from[1]} * var(--k))`);
+    cur.className = hand ? "hand drag" : "move";             // laptop: just moving the mouse, no press
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 3;
   }
   if (st.id === "zoom") startZoomDemo();
+  if (!st.keepNote) $("tour").classList.remove("clear");    // the note view already greys the map on note steps
+  placePhoneCopy();
 
-  // open step: after the click, the note under the cursor opens
-  $("tour").classList.remove("clear");
-  if (st.opensNote) {
-    tourTimer = setTimeout(() => {
-      const n = noteNear(st.from);
-      if (n && tourStep === TOUR.indexOf(st)) { tourNote = n; openNote(n); }
-    }, 2600 * 0.62);
+  // steps that click something: wait for the camera (after the zoom demo) or the note view, then glide there and click
+  if (st.cursor === "click") {
+    const run = (tries = 0) => {
+      if (activeTour[tourStep] !== st) return;
+      let x, y;
+      if (st.opensNote) {
+        controls.autoRotate = false;
+        tourNote = pickTourNote();
+        if (!tourNote) return;
+        const c = graph.graph2ScreenCoords(tourNote.x || 0, tourNote.y || 0, tourNote.z || 0);
+        x = Math.min(innerWidth - 40, Math.max(40, c.x)); y = Math.min(innerHeight - 40, Math.max(40, c.y));
+      } else {
+        const el = st.target();
+        const r = el && !el.hidden ? el.getBoundingClientRect() : null;
+        if (!r || !r.width || !viewNote) { if (tries < 30) tourTimer = setTimeout(() => run(tries + 1), 100); return; }
+        x = r.left + r.width / 2; y = r.top + r.height / 2;
+      }
+      st.from = toStage(x, y);
+      st.start = [st.from[0] + 240, st.from[1] + 150];
+      at(cur, st.from[0], st.from[1]);
+      cur.hidden = false;
+      clickDemo(cur, st);
+      tourTimer = setTimeout(() => {                         // the moment of the click
+        if (activeTour[tourStep] !== st) return;
+        if (st.opensNote) { openNote(tourNote); setTimeout(placePhoneCopy, 1100); }
+        if (st.id === "respond" && !hand) tourRespondDemo(); // phones would open the camera: just show the tap
+        if (st.id === "expand") { focusItem(st.target()); placePhoneCopy(); }
+      }, 2600 * 0.55);
+    };
+    if (st.id === "expand" && $("noteView").classList.contains("responding")) {   // back from the QR card first
+      $("noteView").classList.remove("responding"); $("nvCard").hidden = true;
+    }
+    tourTimer = setTimeout(run, zoomWasOn ? 650 : st.id === "expand" ? 550 : 0);
   }
+}
+// phones: while a note is open, the text goes under the note's button (not on top of it)
+function placePhoneCopy() {
+  const c = $("tourCopy");
+  if (!c.classList.contains("phone")) return;
+  if (!viewNote || $("tour").hidden) { c.style.top = ""; c.style.bottom = ""; return; }
+  const el = $("nvRespond").hidden ? $("nvImg") : $("nvRespond");
+  c.style.top = Math.round(el.getBoundingClientRect().bottom + 18) + "px";
+  c.style.bottom = "auto";
+}
+// "Respond with a photo" in the walkthrough: show the QR card (a real link: scanning it opens the camera
+// to respond to this note), without starting a live connection
+function tourRespondDemo() {
+  if (!viewNote) return;
+  $("nvImg").style.transition = "";
+  $("noteView").classList.add("responding");
+  $("nvCard").hidden = false;
+  drawQR($("nvQr"), CONFIG.PHONE_URL + "?reply=" + encodeURIComponent(viewNote.id));
 }
 // cursor glides from st.start to st.from, presses, (loops on the "add" step)
 let demoAnim = null;
 function clickDemo(cur, st) {
-  const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--k")) || 1;
+  const k = $("tourStage").getBoundingClientRect().width / 1512 || 1;   // 1 Figma px on this screen
   const dx = (st.start[0] - st.from[0]) * k, dy = (st.start[1] - st.from[1]) * k;
   const hand = cur.classList.contains("hand");
   cur.src = hand ? "icons/hand-point.png" : "icons/cursor.svg";
@@ -744,30 +834,15 @@ function clickDemo(cur, st) {
   ], { duration: 2600, iterations: st.loop ? Infinity : 1, fill: "forwards", easing: "ease-in-out" });
   // switch to the "clicking" cursor at the moment of the press
   const swap = () => {
-    if (TOUR[tourStep] !== st) return;
+    if (activeTour[tourStep] !== st) return;
     cur.src = hand ? "icons/hand-tap.png" : "icons/cursor-click.svg";
-    setTimeout(() => { if (TOUR[tourStep] === st) cur.src = hand ? "icons/hand-point.png" : "icons/cursor.svg"; }, 700);
+    setTimeout(() => { if (activeTour[tourStep] === st) cur.src = hand ? "icons/hand-point.png" : "icons/cursor.svg"; }, 700);
   };
   setTimeout(swap, 2600 * 0.5);
-  if (st.loop) tourTimer = setInterval(swap, 2600);
-}
-
-// the note closest to a point on the Figma artboard
-function noteNear([fx, fy]) {
-  const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--k")) || 1;
-  const stage = $("tourStage").getBoundingClientRect();
-  const px = stage.left + fx * k, py = stage.top + fy * k;
-  let best = null, bd = Infinity;
-  notes.forEach(n => {
-    if (!n.__group || n.__arriving) return;
-    const c = graph.graph2ScreenCoords(n.x || 0, n.y || 0, n.z || 0);
-    const d = Math.hypot(c.x - px, c.y - py);
-    if (d < bd) { bd = d; best = n; }
-  });
-  return best;
+  if (st.loop) setInterval(swap, 2600);
 }
 $("tour").addEventListener("click", nextTourStep);
-$("helpBtn").addEventListener("click", startTour);
+$("navHow").addEventListener("click", startTour);       // "How to navigate" in the menu (was the ? button)
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("tour").hidden) endTour(); });
 
 // first visit: show it once, after the opening animation
