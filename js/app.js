@@ -179,14 +179,17 @@ controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
 controls.addEventListener("start", () => (controls.autoRotate = false));
 
 // ---- scroll turns the map, pinch zooms (smoothly) ----
-// Like comfortmagazine.world: a light scroll (mouse wheel or two fingers on the trackpad) turns the map around.
+// Scroll up/down (mouse wheel or two fingers on the trackpad) tilts the map up/down,
+// scroll left/right turns it left/right. The map follows your fingers, like dragging it.
+// Strength and easing are the same as comfortmagazine.world's drag: 0.005 per pixel sideways,
+// 0.003 up/down, eased 10% / 8% per frame, tilt stops at about 50° up or down.
 // Pinch on the trackpad (or Ctrl + mouse wheel) zooms. Drag still turns it too. Phones keep finger drag + pinch.
-let spin = 0;                 // turning speed left over from the last scrolls (slows down by itself)
+let turnLeft = 0, tiltLeft = 0; // how much turning is still to come (eases out by itself)
 let zoomGoal = null;          // distance the camera is gliding to
 let camTweenUntil = 0;        // while the camera flies somewhere (open a note, walkthrough), scroll waits
 const camPos = graph.cameraPosition;
 graph.cameraPosition = function (pos, look, ms) {
-  if (pos) { spin = 0; zoomGoal = null; if (ms) camTweenUntil = performance.now() + ms; }
+  if (pos) { turnLeft = tiltLeft = 0; zoomGoal = null; if (ms) camTweenUntil = performance.now() + ms; }
   return camPos.apply(this, arguments);
 };
 function camDistance() { return graph.camera().position.distanceTo(controls.target); }
@@ -206,9 +209,8 @@ $("map").addEventListener("wheel", e => {
     zoomBy(Math.exp(Math.max(-30, Math.min(30, dy)) * 0.0051 * CONFIG.ZOOM_SPEED));
     return;
   }
-  const d = Math.abs(dx) > Math.abs(dy) ? dx : dy;       // sideways or up/down: both turn the map
-  spin += Math.max(-120, Math.min(120, d)) * CONFIG.SCROLL_TURN * 0.00007;
-  spin = Math.max(-0.08, Math.min(0.08, spin));
+  turnLeft += dx * 0.005 * CONFIG.SCROLL_TURN;           // left / right
+  tiltLeft += dy * 0.003 * CONFIG.SCROLL_TURN;           // up / down
 }, { capture: true, passive: false });
 // Safari sends trackpad pinch as "gesture" events instead
 let gestureFrom = 1;
@@ -221,16 +223,23 @@ $("map").addEventListener("gesturechange", e => {
   zoomBy(Math.pow(gestureFrom / s, CONFIG.ZOOM_SPEED));
   gestureFrom = s;
 });
-// every frame: apply what is left of the turn and the zoom, easing out
+// every frame: apply part of what is left of the turn, tilt and zoom, easing out
+const TILT_MIN = Math.PI / 2 - 0.9, TILT_MAX = Math.PI / 2 + 0.9;
 const _off = new THREE.Vector3(), _sph = new THREE.Spherical();
 function glide() {
   const cam = graph.camera(), t = controls.target;
-  if (Math.abs(spin) > 0.00005 || zoomGoal !== null) {
+  if (turnLeft || tiltLeft || zoomGoal !== null) {
     _off.copy(cam.position).sub(t);
     _sph.setFromVector3(_off);
-    _sph.theta -= spin;
-    spin *= 0.9;                                          // slows down smoothly after you stop scrolling
-    if (Math.abs(spin) <= 0.00005) spin = 0;
+    const turn = turnLeft * 0.1, tilt = tiltLeft * 0.08;
+    turnLeft -= turn; tiltLeft -= tilt;
+    if (Math.abs(turnLeft) < 0.0002) turnLeft = 0;
+    if (Math.abs(tiltLeft) < 0.0002) tiltLeft = 0;
+    _sph.theta += turn;
+    const phi = _sph.phi + tilt;                          // stop at the top / bottom limit (never pushes further out)
+    if (tilt > 0) _sph.phi = Math.max(_sph.phi, Math.min(phi, TILT_MAX));
+    else if (tilt < 0) _sph.phi = Math.min(_sph.phi, Math.max(phi, TILT_MIN));
+    if ((tilt > 0 && _sph.phi >= TILT_MAX) || (tilt < 0 && _sph.phi <= TILT_MIN)) tiltLeft = 0;
     if (zoomGoal !== null) {
       _sph.radius += (zoomGoal - _sph.radius) * 0.16;    // glide toward the zoom, no jumps
       if (Math.abs(zoomGoal - _sph.radius) < 0.05) { _sph.radius = zoomGoal; zoomGoal = null; }
@@ -306,11 +315,17 @@ function fitCamera(ms = 1200) {
   graph.cameraPosition({ x: 0, y: 0, z }, { x: 0, y: 0, z: 0 }, ms);
 }
 
+// The camera flies close to the note, on the line from the map's center through the note,
+// and keeps looking at the center: the note is in the middle of the screen, and the map
+// still turns around its own center afterwards (it never becomes the clicked note).
 function flyTo(node, ms = 1500) {
-  const dist = CONFIG.NOTE_SIZE * 4, r = Math.hypot(node.tx, node.ty, node.tz) || 1;   // how close it flies
-  const k = 1 + dist / r;
-  graph.cameraPosition({ x: node.tx * k, y: node.ty * k, z: node.tz * k },
-                       { x: node.tx, y: node.ty, z: node.tz }, ms);
+  const dist = CONFIG.NOTE_SIZE * 4;                     // how close it flies
+  let dir = new THREE.Vector3(node.tx, node.ty, node.tz);
+  const r = dir.length();
+  if (r < 1) dir = graph.camera().position.clone();      // a note right at the center: come from where you are
+  dir.normalize();
+  const p = dir.multiplyScalar(r + dist);
+  graph.cameraPosition({ x: p.x, y: p.y, z: p.z }, { x: 0, y: 0, z: 0 }, ms);
 }
 
 // ---- click a note: the camera flies close, then the note view opens ----
@@ -821,6 +836,7 @@ function showNoteView(n) {
 }
 function hideNoteView() {
   stopRespond();
+  resetFocus();                                                // the note (not a response) shrinks back to the map
   const n = viewNote, v = $("noteView"), img = $("nvImg");
   viewNote = null;
   if (!n || v.hidden) { v.hidden = true; if (n) n.__note.visible = true; return; }
@@ -845,6 +861,7 @@ function hideNoteView() {
 const PHONE_SLOTS = [[50, 52], [-8, 56], [56, -10], [-10, -8], [22, 62], [60, 22], [-12, 24], [24, -14], [36, 40]];
 const phoneView = () => matchMedia("(max-width: 700px)").matches;
 function drawResponses(n, animateLast = false) {
+  resetFocus();
   const box = $("nvResponses"), list = responsesFor[n.id] || [];
   box.innerHTML = "";
   list.slice(0, RESPONSE_SLOTS.length).forEach((r, i) => {
@@ -859,8 +876,53 @@ function drawResponses(n, animateLast = false) {
       el.style.left = `calc(${RESPONSE_SLOTS[i][0]} * var(--k))`;
       el.style.top = `calc(${RESPONSE_SLOTS[i][1]} * var(--k))`;
     }
+    if (r.image) {                                            // click a response: see it up close
+      el.dataset.item = i;
+      el.classList.add("canFocus");
+      el.addEventListener("click", e => { e.stopPropagation(); focusItem(el); });
+    }
     box.appendChild(el);
   });
+  bigItem = "note";
+}
+
+// ---- see a response up close ----
+// Click a response: it grows into the note's big spot and the note shrinks into the response's spot.
+// Click the small note (or another response) to switch again.
+let bigItem = "note";              // what is big right now: "note" or the number of a response
+function itemImage(n, item) { return item === "note" ? n.image : (responsesFor[n.id] || [])[item].image; }
+function focusItem(el) {
+  const n = viewNote;
+  if (!n || !$("nvCard").hidden) return;
+  const big = $("nvImg"), was = bigItem, next = el.dataset.item === "note" ? "note" : +el.dataset.item;
+  const a = big.getBoundingClientRect(), b = el.getBoundingClientRect();
+  // swap pictures, then animate each one from where the other was (so they trade places)
+  big.src = itemImage(n, next) || "";
+  el.src = itemImage(n, was) || "";
+  el.dataset.item = was;
+  bigItem = next;
+  const fromRect = (to, from) => `translate(${from.left + from.width / 2 - (to.left + to.width / 2)}px, ${from.top + from.height / 2 - (to.top + to.height / 2)}px) scale(${from.width / to.width}, ${from.height / to.height})`;
+  const ease = { duration: 500, easing: "cubic-bezier(.2,.75,.2,1)" };
+  big.animate([{ transform: fromRect(a, b) }, { transform: "none" }], ease);
+  el.animate([{ transform: fromRect(b, a), zIndex: 3 }, { transform: "none", zIndex: 3 }], ease);
+  el.classList.toggle("isNote", was === "note");
+  // label and button belong to the note: show them only while the note is big
+  $("nvLabel").textContent = next === "note" ? "Open to responses" : "Response";
+  $("nvLabel").hidden = next === "note" ? !n.allowReplies : false;
+  $("nvRespond").hidden = next === "note" ? !n.allowReplies : true;
+  $("nvImg").alt = next === "note" ? n.text : ((responsesFor[n.id] || [])[next].text || "A response");
+  track("response_view", { id: n.id, item: next });
+}
+// put the note back in the big spot at once (before closing or redrawing)
+function resetFocus() {
+  if (bigItem === "note" || !viewNote) return;
+  const el = $("nvResponses").querySelector(".nvResp.isNote");
+  if (el) { el.src = itemImage(viewNote, bigItem) || ""; el.dataset.item = bigItem; el.classList.remove("isNote"); }
+  $("nvImg").src = viewNote.image || "";
+  $("nvImg").alt = viewNote.text;
+  $("nvLabel").textContent = "Open to responses";
+  $("nvLabel").hidden = $("nvRespond").hidden = !viewNote.allowReplies;
+  bigItem = "note";
 }
 
 // "Click here to get a response QR code" → instructions + QR (flow 2)

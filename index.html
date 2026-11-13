@@ -32,7 +32,7 @@
     /* flow 1: the note in the middle, "Open to responses" above it, the button below */
     #nvImg { position: absolute; z-index: 1; left: calc(540 * var(--k)); top: calc(295 * var(--k)); width: calc(432 * var(--k)); height: calc(429 * var(--k));
       object-fit: cover; box-shadow: 0 calc(10 * var(--k)) calc(30 * var(--k)) rgba(0,0,0,0.25); transition: left 0.5s ease; cursor: default; }
-    #nvLabel { position: absolute; left: calc(540 * var(--k)); top: calc(256 * var(--k)); margin: 0; color: #fff; white-space: nowrap;
+    #nvLabel { position: absolute; z-index: 3; left: calc(540 * var(--k)); top: calc(256 * var(--k)); margin: 0; color: #fff; white-space: nowrap;
       font-family: Helvetica, Arial, sans-serif; font-size: max(15px, calc(20 * var(--k))); transition: left 0.5s ease; }
     #nvLabel[hidden] { display: none; }
     #nvRespond { all: unset; box-sizing: border-box; cursor: pointer; position: absolute; left: calc(756 * var(--k)); top: calc(779 * var(--k)); transform: translateX(-50%);
@@ -47,6 +47,8 @@
     /* responses sit on top of the note */
     .nvResp { position: absolute; z-index: 2; width: calc(176 * var(--k)); height: calc(175 * var(--k)); background: #fff; object-fit: cover;
       box-shadow: 0 calc(6 * var(--k)) calc(18 * var(--k)) rgba(0,0,0,0.2); }
+    .nvResp.canFocus { cursor: pointer; transition: transform 0.2s ease; }      /* click a response to see it up close */
+    @media (hover: hover) { .nvResp.canFocus:hover { transform: scale(1.04); } }
     .nvResp.landing { animation: respLand 0.7s cubic-bezier(.2,.9,.3,1.2); }
     @keyframes respLand { from { transform: translate(calc(60 * var(--k)), calc(120 * var(--k))) scale(1.4); opacity: 0; } }
     #nvResponses { transition: opacity 0.3s ease; }
