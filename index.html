@@ -217,6 +217,8 @@
       display: flex; flex-direction: column; gap: calc(35 * var(--k)); }
     .about h2 { font-weight: 400; font-size: max(18px, calc(24 * var(--k))); text-align: center; text-wrap: pretty; }
     .about .ph { width: 100%; aspect-ratio: 807 / 445; background: #d9d9d9; object-fit: cover; display: block; }
+    .about .phPair { display: flex; gap: max(6px, calc(10 * var(--k))); width: 100%; }   /* two photos side by side (Figma about) */
+    .about .phPair .ph { flex: 1 1 0; min-width: 0; }
     .about p, .about li { font-size: max(15px, calc(20 * var(--k))); line-height: normal; text-wrap: pretty; }
     .about .text p + p { margin-top: 1.2em; }
     .about .text p.tight + p, .about .text p + p.tight { margin-top: 0; }
@@ -388,8 +390,14 @@
         <p>The reason I chose handwritten notes is that handwritten notes can translate a much more personal feeling and make it easier for people to connect. In the time of AI and technology, I felt that the sensibility of a handwriting and a paper texture carries a special value. Posting a hand-written note slows people down, making every note feel valuable. The first notes were collected in person on paper sticky notes (late October-early November 2026).</p>
       </div>
       <img class="ph" loading="lazy" src="about/notes.jpg" alt="" style="aspect-ratio:807/437">
+      <img class="ph" loading="lazy" src="about/writing.jpg" alt="Someone writing a wish on a sticky note" style="aspect-ratio:677/355">
 
       <h2>How it works</h2>
+      <img class="ph" loading="lazy" src="about/how-it-works.jpg" alt="" style="aspect-ratio:807/511">
+      <div class="phPair">
+        <img class="ph" loading="lazy" src="about/phone-1.jpg" alt="Taking a photo of a note with a phone" style="aspect-ratio:322/225">
+        <img class="ph" loading="lazy" src="about/phone-2.jpg" alt="Checking the note on the phone" style="aspect-ratio:322/225">
+      </div>
       <div class="text">
         <p>Common Ground is built on the same logic as <a href="https://projector.tensorflow.org/" target="_blank" rel="noopener">Google's TensorFlow Embedding Projector</a>, a tool that shows how an AI groups meaning in 3D. The site reads each note, understands what it means, and places it in a 3D space next to notes with a similar meaning.</p>
         <ol>
@@ -400,7 +408,6 @@
           <li>Your note is placed near notes with a similar meaning. As more notes appear, groups start to form based on submitted notes. Groups form from a minimum of 3 wishes to start a group.</li>
         </ol>
       </div>
-      <img class="ph" loading="lazy" src="about/how-it-works.jpg" alt="" style="aspect-ratio:807/511">
 
       <h2>Care and privacy</h2>
       <div class="text">
@@ -455,9 +462,8 @@
           <li>Google's TensorFlow Embedding Projector.</li>
         </ul>
       </div>
-      <img class="ph" loading="lazy" src="about/aiya.jpg" alt="Aiya">
-
       <h2>About me</h2>
+      <img class="ph" loading="lazy" src="about/aiya.jpg" alt="Aiya">
       <div class="text">
         <p class="tight">I'm Aiya, a senior in Communication Design at Parsons School of Design, based in Brooklyn. Common Ground is part of my thesis, where I explore how people can connect through technology and what happens when personal, offline expression meets online data. I grew up practicing fine art, and I now work where design, code and people meet. I researched and designed this project in Figma and built it with HTML, CSS and JavaScript, using a 3D graph library and Claude Code (an AI coding tool).</p>
         <p class="tight">More of my work: <a href="https://aiyazhumagaliyeva.com" target="_blank" rel="noopener">aiyazhumagaliyeva.com</a></p>
