@@ -409,6 +409,36 @@
         <p class="privacy"><button type="button" id="optOut" class="linkBtn">Don’t count my visits</button></p>
       </div>
 
+      <!-- DRAFT (written by Claude from what the site really does — edit freely) -->
+      <h2>The research</h2>
+      <div class="text">
+        <p>Common Ground is also a research project. I want to understand how strangers behave around each other's private wishes: do people read before they write, which wishes make them stop, and will they answer someone they will never meet?</p>
+        <p class="tight">To find out, the site counts what people do, anonymously. There are no names, no accounts and no exact location. I measure:</p>
+        <ul>
+          <li>Where visitors come from. Every poster, sticker, post and link has its own QR code or link, so I can see which places bring people (29 kinds, from flyers to Instagram stories).</li>
+          <li>Phone or laptop, screen size and language.</li>
+          <li>Which notes people stop on for at least a second, which ones they open, and for how long.</li>
+          <li>How many people start adding a note, take the photo, retake it, and send it.</li>
+          <li>How many people answer a note, and how many open an answer up close.</li>
+          <li>How far people get in the walkthrough.</li>
+          <li>Heatmaps and recordings of clicks and scrolling on the pages (Microsoft Clarity).</li>
+        </ul>
+        <p>You can opt out at any time with the “Don’t count my visits” button above.</p>
+      </div>
+
+      <h2>How I built it</h2>
+      <div class="text">
+        <p class="tight">I treated the site as one user journey, from a paper note in someone's hand to a note on the map, and designed every step in Figma before building it.</p>
+        <ul>
+          <li>Paper first. You write by hand and use your phone only as a camera. On a laptop, a QR code hands the job to your phone, and your note lands on the big screen the moment you send it.</li>
+          <li>A camera made for paper: zoom, light, flash and tap to focus, so the handwriting stays readable.</li>
+          <li>Checks before anything goes public. AI reads the handwriting and you confirm it. Notes that are gibberish or show a person's face are not posted. Anything flagged is emailed to me right away, and I get a summary every 10 notes.</li>
+          <li>A simple database. Every note, answer and visit goes into a Google Sheet through Google Apps Script, so I can read and moderate everything in one place.</li>
+          <li>Answers. You can respond to a note with your own photo, and answer a response, up to three in a thread.</li>
+          <li>A short walkthrough that shows how to move around the map.</li>
+        </ul>
+      </div>
+
       <h2>Inspirations</h2>
       <div class="text">
         <ul>
