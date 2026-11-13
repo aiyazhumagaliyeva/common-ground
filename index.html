@@ -72,7 +72,7 @@
         padding: 12px 24px; font-size: 16px; }
       .nvResp { width: 26vw; height: 26vw; }
     }
-    #tourCopy.phone { position: fixed; left: 24px; right: 24px; bottom: 110px; width: auto; z-index: 1; }
+    #tourCopy.phone { position: fixed; left: 24px; right: 24px; bottom: 110px; width: auto; z-index: 1; transform: none; }
     #tourCopy.phone #tourText { font-size: 18px; }
     #tourCopy.phone #tourImage { max-width: 100%; }
 
@@ -81,15 +81,15 @@
     #tour[hidden] { display: none; }
     @keyframes tourIn { from { opacity: 0; } }
     #tourStage { position: absolute; left: 50%; top: 50%; width: calc(1512 * var(--k)); height: calc(982 * var(--k)); transform: translate(-50%, -50%); }
-    #tourCopy { position: absolute; width: calc(463 * var(--k)); color: #fff; font-family: Helvetica, Arial, sans-serif; }
+    /* laptop: the text box is placed by its bottom edge, so the text sits in the same spot on every step */
+    #tourCopy { position: absolute; width: calc(463 * var(--k)); color: #fff; font-family: Helvetica, Arial, sans-serif;
+      display: flex; flex-direction: column; transform: translateY(-100%); }
     #tourText { font-size: max(16px, calc(20 * var(--k))); line-height: normal; margin: 0; }
     #tourHint { font-size: max(12px, calc(14 * var(--k))); opacity: 0.7; margin: calc(10 * var(--k)) 0 0; }
-    #tourImage { display: block; height: auto; margin-top: calc(18 * var(--k)); }
+    #tourImage { display: block; height: auto; order: -1; margin-bottom: calc(18 * var(--k)); }   /* drawing above the text */
     #tourImage[hidden] { display: none; }
     #tourCursor { position: absolute; width: calc(31 * var(--k)); height: auto; pointer-events: none; }
     #tourCursor.drag { animation: tourDrag 2.4s ease-in-out infinite; }
-    #tourCursor.move { animation: tourMove 2.4s ease-in-out infinite; }   /* laptop: the mouse just moves, no press */
-    @keyframes tourMove { 0%, 10% { transform: translate(0, 0); } 70%, 100% { transform: translate(var(--dx), var(--dy)); } }
     /* phones: hand drawings; the fingertip sits on the point */
     #tourCursor.hand { width: 96px; margin: -14px 0 0 -22px; }   /* your drawings as they are: black lines, white fill */
     @keyframes tourDrag { 0%, 12% { transform: translate(0, 0) scale(1); } 18% { transform: translate(0, 0) scale(0.88); }
@@ -231,27 +231,17 @@
     .privacy { font-size: 0.85em; color: rgba(0,0,0,0.5); }
     a.brand { color: #000; text-decoration: none; cursor: pointer; }   /* clicking the name reloads the page */
 
-    /* ---------- PHONE (Figma: phone-home, phone-menu, phone-about, phone-contact) ---------- */
-    #phoneBar, #phoneMenu, .mob { display: none; }
+    /* ---------- PHONE (Figma: phone-home-NEW, phone-about) ---------- */
+    @media (max-width: 379px) { #nav { gap: 10px !important; padding: 8px 14px !important; font-size: 14px !important; } }
+    .mob { display: none; }
     @media (max-width: 600px) {
       .desk { display: none !important; }
       .mob { display: revert; }
-      #nav, #brandTop { display: none; }
-      .brand-phone, #phoneBar .brand, #phoneMenu .brand { font-family: Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: 20px; color: #000; white-space: nowrap; }
-      /* header: name left, menu icon right */
-      #phoneBar { display: flex; position: fixed; z-index: 5; left: 26px; right: 33px; top: calc(30px + env(safe-area-inset-top, 0px));
-        align-items: center; justify-content: space-between; transition: opacity 0.3s ease; }
-      body.page-open #phoneBar { opacity: 0; pointer-events: none; }
-      #phoneBar button, #phoneMenu button { all: unset; cursor: pointer; }
-      #phoneBar #menuBtn { padding: 22px; margin: -22px; }       /* the icon stays put; the tap area is ~67 × 62 */
-      #menuBtn img { width: 23px; height: 18px; display: block; }
-      /* menu: white screen, big links */
-      #phoneMenu:not([hidden]) { display: block; position: fixed; inset: 0; z-index: 9; background: #fff; animation: tourIn 0.25s ease-out; }
-      #phoneMenu .top { position: absolute; left: 26px; right: 33px; top: calc(30px + env(safe-area-inset-top, 0px)); display: flex; align-items: center; justify-content: space-between; }
-      #phoneMenu #menuClose { padding: 24px; margin: -24px; }
-      #menuClose img { width: 16px; height: 16px; display: block; }
-      #phoneMenu .items { position: absolute; left: 26px; top: calc(133px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 40px; }
-      #phoneMenu .items button { font-family: Helvetica, Arial, sans-serif; font-size: 32px; color: #000; }
+      /* Figma phone-home-NEW: name top left (15 / 23, bold 20), the same menu pill at the bottom (40 from the bottom) */
+      #brandTop { display: block; left: 15px; top: calc(23px + env(safe-area-inset-top, 0px)); font-size: 20px; }
+      #nav { display: flex; bottom: calc(40px + env(safe-area-inset-bottom, 0px)); gap: 15px; padding: 10px 20px; border-radius: 40px; font-size: 16px; white-space: nowrap; }
+      #nav .camera { width: 20px; }
+      #nav .divider { height: 19px; }
       /* pages: back arrow + name at the top */
       .page .back { position: fixed; left: 0; right: 0; top: 0; z-index: 2; display: flex; align-items: center; gap: 16px;
         padding: calc(30px + env(safe-area-inset-top, 0px)) 25px 12px; background: #fff; }
@@ -283,22 +273,6 @@
   <div id="map"></div>
   <div id="mapInfo"></div>
 
-  <!-- ---------- PHONE HEADER + MENU (Figma: phone-home, phone-menu) ---------- -->
-  <header id="phoneBar">
-    <a class="brand" href="">Common Ground</a>
-    <button id="menuBtn" aria-label="Open the menu" aria-expanded="false"><img src="icons/menu.svg" alt=""></button>
-  </header>
-  <div id="phoneMenu" hidden>
-    <div class="top">
-      <a class="brand" href="">Common Ground</a>
-      <button id="menuClose" aria-label="Close the menu"><img src="icons/close.svg" alt=""></button>
-    </div>
-    <nav class="items" aria-label="Menu">
-      <button data-go="navAdd">Add a note</button>
-      <button data-go="navHow">How to navigate</button>
-      <button data-go="navAbout">About</button>
-    </nav>
-  </div>
 
   <!-- ---------- NAV PILL ---------- -->
   <!-- ---------- NOTE VIEW (Figma: home-responce-new, home-response-flow-1/2/3) ---------- -->

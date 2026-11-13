@@ -223,37 +223,16 @@ $("map").addEventListener("gesturechange", e => {
   zoomBy(Math.pow(gestureFrom / s, CONFIG.ZOOM_SPEED));
   gestureFrom = s;
 });
-// ---- moving the mouse turns the map gently (like comfortmagazine.world, but softer) ----
-// The map leans toward where the mouse is: mouse right → the map turns right, mouse down → it tilts down.
-// It holds still while the mouse is on a note (so the note doesn't run away from the click),
-// while you press/drag, while a note or the walkthrough is open. MOUSE_TURN in config: 0 = off.
-let mouseAim = null, aimNow = { x: 0, y: 0 }, mousePressed = false;
-$("map").addEventListener("pointermove", e => {
-  if (e.pointerType !== "mouse") return;                // phones and tablets: finger drag only
-  mouseAim = { x: e.clientX / innerWidth * 2 - 1, y: e.clientY / innerHeight * 2 - 1 };   // -1 … 1 from the middle
-});
-$("map").addEventListener("pointerdown", () => (mousePressed = true));
-window.addEventListener("pointerup", () => (mousePressed = false));
-document.addEventListener("mouseleave", () => (mouseAim = null));   // left the window: stay where it is
-function mouseLean() {                                   // how much to turn / tilt this frame because of the mouse
-  const k = CONFIG.MOUSE_TURN ?? 1;
-  if (!k || !mouseAim || mousePressed || hoverNote || mapBusy() || document.body.classList.contains("page-open")) return [0, 0];
-  const dx = (mouseAim.x - aimNow.x) * 0.05, dy = (mouseAim.y - aimNow.y) * 0.05;
-  aimNow.x += dx; aimNow.y += dy;
-  return [-dx * 0.6 * k, -dy * 0.25 * k];               // up to ~34° left/right and ~14° up/down from where you are
-}
-
 // every frame: apply part of what is left of the turn, tilt and zoom, easing out
 const TILT_MIN = Math.PI / 2 - 0.9, TILT_MAX = Math.PI / 2 + 0.9;
 const _off = new THREE.Vector3(), _sph = new THREE.Spherical();
 function glide() {
   const cam = graph.camera(), t = controls.target;
-  const [leanTurn, leanTilt] = mouseLean();
-  if (turnLeft || tiltLeft || zoomGoal !== null || Math.abs(leanTurn) > 1e-5 || Math.abs(leanTilt) > 1e-5) {
+  if (turnLeft || tiltLeft || zoomGoal !== null) {
     _off.copy(cam.position).sub(t);
     _sph.setFromVector3(_off);
-    const turn = turnLeft * 0.1 + leanTurn, tilt = tiltLeft * 0.08 + leanTilt;
-    turnLeft -= turnLeft * 0.1; tiltLeft -= tiltLeft * 0.08;
+    const turn = turnLeft * 0.1, tilt = tiltLeft * 0.08;
+    turnLeft -= turn; tiltLeft -= tilt;
     if (Math.abs(turnLeft) < 0.0002) turnLeft = 0;
     if (Math.abs(tiltLeft) < 0.0002) tiltLeft = 0;
     _sph.theta += turn;
@@ -471,15 +450,6 @@ $("navAdd").addEventListener("click", () => {
   startHandoff();
 });
 $("navAbout").addEventListener("click", () => { openPage("aboutPage"); track("about_open"); });
-// phone menu (Figma: phone-menu): the same three buttons as the desktop pill
-function setMenu(open) {
-  $("phoneMenu").hidden = !open;
-  $("menuBtn").setAttribute("aria-expanded", open);
-  if (open) track("menu_open");
-}
-$("menuBtn").addEventListener("click", () => setMenu(true));
-$("menuClose").addEventListener("click", () => setMenu(false));
-document.querySelectorAll("#phoneMenu [data-go]").forEach(b => b.addEventListener("click", () => { setMenu(false); $(b.dataset.go).click(); }));
 $("optOut").addEventListener("click", () => { optOut(); $("optOut").outerHTML = "<span>Done, your visits aren’t counted.</span>"; });
 if (optedOut()) $("optOut").outerHTML = "<span>Your visits aren’t counted.</span>";
 document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeAll));
@@ -644,20 +614,22 @@ function setPos(n, v) {
 //  Click anywhere to go to the next step; Esc closes it.
 // ============================================================
 const touch = matchMedia("(pointer: coarse)").matches;
+// every step's text sits in the same spot, bottom right: its bottom edge lines up with the bottom of the menu pill
+const TOUR_TEXT_AT = [1010, 912];
 const TOUR = [
-  { id: "rotate", phone: "Drag with one finger to rotate the map", text: "Move the mouse to rotate the map",
-    cursor: "move", from: [671, 532], to: [990, 579], textAt: [894, 740] },   // above the menu pill (now at the bottom)
+  { id: "rotate", phone: "Drag with one finger to rotate the map", text: "Slide two fingers on the trackpad to rotate the map",
+    from: [671, 532], to: [990, 579], textAt: TOUR_TEXT_AT },
   { id: "zoom", phone: "Pinch with two fingers to zoom in or zoom out", text: "Pinch with two fingers on the trackpad to zoom in or zoom out",
-    image: "illustrations/zoom.png", textAt: [955, 648], imageAt: [955, 713, 409, 221] },
+    image: "illustrations/zoom.png", textAt: TOUR_TEXT_AT, imageAt: [955, 713, 409, 221] },   // the drawing sits above the text
   { id: "open", phone: "Tap a note to open it", text: "Click to open a note",
-    cursor: "click", textAt: [60, 130], opensNote: true },   // top left: clear of the open note and its responses
+    cursor: "click", textAt: TOUR_TEXT_AT, opensNote: true },
   // the next two only show when the walkthrough's note can have responses / has some
   { id: "respond", phone: "Tap “Respond with a photo” to answer a note with your own photo",
     text: "Click “Respond with a photo” to answer a note with your own photo",
-    cursor: "click", textAt: [60, 130], keepNote: true, level: 1, target: () => $("nvRespond") },
+    cursor: "click", textAt: TOUR_TEXT_AT, keepNote: true, level: 1, target: () => $("nvRespond") },
   { id: "expand", phone: "Tap a small response to see it up close. Tap the small note to go back.",
     text: "Click a small response to see it up close. Click the small note to go back.",
-    cursor: "click", textAt: [60, 130], keepNote: true, level: 2, target: () => $("nvResponses").querySelector(".canFocus") },
+    cursor: "click", textAt: TOUR_TEXT_AT, keepNote: true, level: 2, target: () => $("nvResponses").querySelector(".canFocus") },
 ];
 let tourStep = -1, tourNote = null, tourTimer = null, activeTour = TOUR, tourLevel = 0;
 
@@ -748,13 +720,13 @@ function nextTourStep() {
   cur.className = hand ? "hand" : "";
   controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
   if (hand && st.id === "zoom") { cur.hidden = false; cur.src = "icons/hand-spread.png"; at(cur, 700, 470); }
-  if (st.id === "rotate") {                                  // the cursor moves across while the map turns
-    cur.hidden = false;
+  if (st.id === "rotate") {                                  // the map turns; phones also show the dragging hand
+    cur.hidden = !hand;                                      // laptop: two fingers on the trackpad don't move the cursor
     cur.src = hand ? "icons/hand-point.png" : "icons/cursor.svg";
     at(cur, st.from[0], st.from[1]);
     cur.style.setProperty("--dx", `calc(${st.to[0] - st.from[0]} * var(--k))`);
     cur.style.setProperty("--dy", `calc(${st.to[1] - st.from[1]} * var(--k))`);
-    cur.className = hand ? "hand drag" : "move";             // laptop: just moving the mouse, no press
+    cur.className = hand ? "hand drag" : "";
     controls.autoRotate = true;
     controls.autoRotateSpeed = 3;
   }
