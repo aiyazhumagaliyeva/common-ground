@@ -151,6 +151,15 @@
     }
     #toggle:not(.private) #open, #toggle.private #share { color: #111; }
 
+    /* paper colour: the first circle is your own photo, then sticky-note colours; the preview updates right away */
+    #paper { left: calc(14 * var(--k)); top: calc(581 * var(--k)); width: calc(365 * var(--k)); height: calc(36 * var(--k)); }
+    body.reviewing #paper { display: flex; justify-content: center; align-items: center; gap: calc(14 * var(--k)); }
+    #paper .chip {
+      all: unset; cursor: pointer; width: calc(30 * var(--k)); height: calc(30 * var(--k)); border-radius: 50%;
+      background: var(--c, #ccc) center / cover; box-shadow: 0 0 0 1px rgba(255,255,255,0.6);
+      transition: box-shadow 0.15s, transform 0.15s;
+    }
+    #paper .chip[aria-checked="true"] { box-shadow: 0 0 0 2px #000, 0 0 0 4px #fff; transform: scale(1.08); }
     #send {
       all: unset; position: absolute; cursor: pointer; text-align: center;
       left: calc(14 * var(--k)); top: calc(627 * var(--k));
@@ -221,6 +230,14 @@
       <button id="open" aria-pressed="true">Open to responses</button>
       <button id="share" aria-pressed="false">Just sharing</button>
     </div>
+    <div id="paper" class="review" role="radiogroup" aria-label="Paper colour">
+      <button class="chip" data-color="" aria-label="Original colour" aria-checked="true" role="radio"></button>
+      <button class="chip" data-color="yellow" aria-label="Yellow" role="radio" style="--c:#fde879"></button>
+      <button class="chip" data-color="pink" aria-label="Pink" role="radio" style="--c:#ffb6d2"></button>
+      <button class="chip" data-color="blue" aria-label="Blue" role="radio" style="--c:#a9dcf7"></button>
+      <button class="chip" data-color="green" aria-label="Green" role="radio" style="--c:#c4ee9f"></button>
+      <button class="chip" data-color="orange" aria-label="Orange" role="radio" style="--c:#ffc58c"></button>
+    </div>
     <button id="send" class="review">Submit</button>
     <button id="retake" class="review">Retake photo</button>
   </div>
@@ -288,6 +305,7 @@
     if (SESSION) fetch(CONFIG.SERVER_URL + "?action=connect&s=" + SESSION).catch(() => {});   // same, without Firebase
     let ocrText = "", how = "camera";
     let thumb = "", allowReplies = true, stream = null;
+    let paperColor = "", stillBase = null, smallBase = null;   // the chosen paper colour + the photos before colouring
 
     // ---------- frosted glass with a rounded hole over the scan window ----------
     function cutHole() {
@@ -465,12 +483,11 @@
 
     async function useImage(src, sx, sy, sw, sh) {
       const big = crop(src, sx, sy, sw, sh, 1200);
-      const small = crop(src, sx, sy, sw, sh, 320, true);
-      thumb = small.toDataURL("image/jpeg", 0.7);
-      if (thumb.length > 48000) thumb = small.toDataURL("image/jpeg", 0.5);
-
-      // freeze: show the photo inside the window, camera off
-      $("still").src = crop(src, sx, sy, sw, sh, 900).toDataURL("image/jpeg", 0.85);
+      smallBase = crop(src, sx, sy, sw, sh, 320, true);
+      stillBase = crop(src, sx, sy, sw, sh, 900);
+      document.querySelector('#paper .chip[data-color=""]').style.backgroundImage = `url(${smallBase.toDataURL("image/jpeg", 0.6)})`;
+      // freeze: show the photo (in the chosen paper colour) inside the window, camera off
+      applyPaper();
       document.body.classList.add("reviewing");
       cutHole();
       tell(SESSION, { step: "photo" });                       // big screen: "Your note is on the way…"
@@ -490,6 +507,45 @@
         $("status").textContent = "We couldn’t read it. Type what it says:";
       }
     }
+
+    // ---- paper colour ----
+    // The paper takes the chosen colour and the handwriting stays dark (ink keeps its own tint):
+    // 1. find the paper's own colour (the brightest 10% of the photo), 2. make the paper white with it,
+    // 3. multiply by the chosen colour — like a real coloured sticky note, not a coloured filter over everything.
+    const PAPERS = { yellow: [253, 232, 121], pink: [255, 182, 210], blue: [169, 220, 247], green: [196, 238, 159], orange: [255, 197, 140] };
+    function colourise(base, name) {
+      const c = document.createElement("canvas"); c.width = base.width; c.height = base.height;
+      const g = c.getContext("2d"); g.drawImage(base, 0, 0);
+      const want = PAPERS[name];
+      if (!want) return c;                                    // original: the photo as it is
+      const img = g.getImageData(0, 0, c.width, c.height), d = img.data, lum = [];
+      for (let i = 0; i < d.length; i += 16) lum.push(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+      lum.sort((a, b) => a - b);
+      const cut = lum[Math.floor(lum.length * 0.9)] || 200;
+      let r = 0, gg = 0, b = 0, n = 0;                        // average colour of the paper
+      for (let i = 0; i < d.length; i += 16) if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] >= cut) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; }
+      r = Math.max(40, r / n); gg = Math.max(40, gg / n); b = Math.max(40, b / n);
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = Math.min(1, d[i] / r) * want[0];
+        d[i + 1] = Math.min(1, d[i + 1] / gg) * want[1];
+        d[i + 2] = Math.min(1, d[i + 2] / b) * want[2];
+      }
+      g.putImageData(img, 0, 0);
+      return c;
+    }
+    function applyPaper() {
+      if (!stillBase) return;
+      $("still").src = colourise(stillBase, paperColor).toDataURL("image/jpeg", 0.85);   // the preview
+      const small = colourise(smallBase, paperColor);                                    // what goes on the map
+      thumb = small.toDataURL("image/jpeg", 0.7);
+      if (thumb.length > 48000) thumb = small.toDataURL("image/jpeg", 0.5);
+    }
+    document.querySelectorAll("#paper .chip").forEach(chip => chip.onclick = () => {
+      paperColor = chip.dataset.color;
+      document.querySelectorAll("#paper .chip").forEach(c => c.setAttribute("aria-checked", c === chip));
+      applyPaper();
+      track("paper_color", { color: paperColor || "original" });
+    });
 
     function clean(t) {
       t = t.replace(/\s+/g, " ").trim();
@@ -518,7 +574,7 @@
       if (REPLY) allowReplies = false;
       $("send").disabled = true; $("send").textContent = "Sending…";
       try {
-        const saved = await post({ action: "submit", text: full, image: thumb, allowReplies, session: SESSION, source: SOURCE, replyTo: REPLY });
+        const saved = await post({ action: "submit", text: full, image: thumb, allowReplies, color: paperColor, session: SESSION, source: SOURCE, replyTo: REPLY });
         if (saved.error) throw new Error(saved.error);
         const flag = saved.flag || checkNote(full);
         // big screen: the note flies in (only safe notes carry text and photo)

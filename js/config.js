@@ -40,6 +40,7 @@ export const CONFIG = {
   NOTE_SIZE: 15,           // size of one note in 3D
   START_ZOOM: 250,        // closest the camera starts (smaller = closer)
   MAX_ZOOM: 400,          // farthest it starts, when there are many notes
+  LAPTOP_START_ZOOM: 230, // laptops: how close the map starts (smaller = closer; 0 = fit the whole map)
   PHONE_START_ZOOM: 170,  // phones: how close the map starts (smaller = closer; 0 = same as laptops)
   MAX_PIXEL_RATIO: 1.5,   // sharpness on Retina screens: 2 = sharpest but laggy, 1 = smoothest but softer
   ZOOM_TO_MOUSE: false,   // true = zoom toward the mouse (map can drift off-center); false = zoom toward the middle
@@ -47,6 +48,8 @@ export const CONFIG = {
   SCROLL_TURN: 1,         // how strongly scrolling turns the map (1 = same as comfortmagazine.world, 0.5 = half)
   // ---- how a note looks as paper ----
   NOTE_TILT: 5,           // random tilt of each note, in degrees (0 = straight)
+  BRIGHTEN_NOTES: true,   // lift photos taken in poor light (false = show photos exactly as taken)
+  BRIGHTEN_TO: 235,       // how bright the paper becomes (0–255; 255 = white)
   NOTE_SHADOW: true,      // soft shadow under each note
   NOTE_GAP: 0,            // space between notes (0 = off, 1 = edges touch). Bigger = more spread out
   BG_COLOR: "#ffffff",    // map background (also change body background-color in index.html to match)
@@ -54,7 +57,8 @@ export const CONFIG = {
   // PREVIEW ONLY: white placeholder responses on these notes, to judge the layout. Set to {} before launch.
   RESPONSE_PREVIEW: {},
   TOUR_SHOW: "never",       // walkthrough shows by itself: "every-visit" (each new visit), "first-visit" (once per browser), "never" (only with ?)
-  DRIFT_SPEED: 0.35,      // slow turn to the right when the map loads, stops at the first touch/scroll (0 = off)
+  DRIFT_SPEED: 0.35,      // slow turn to the right, all the time (0 = off)
+  DRIFT_RESUME: 4000,     // ms after the last touch/scroll before the slow turn comes back
   FLOAT: 0,               // how much the notes bob up and down (0 = still)
   ARRIVE_SCALE: 1.65,     // how big a new note is when it flies in
   ARRIVE_HOLD: 1200,      // ms you get to see a new note big before it shrinks to its place

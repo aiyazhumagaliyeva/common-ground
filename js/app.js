@@ -60,6 +60,7 @@ function paintNote(n) {
   }
   if (n.__img && n.__img.naturalWidth) {
     g.drawImage(n.__img, x, y, S, S);                    // the photo
+    brighten(g, x, y, S);                                // dark photos (bad light) get lifted, colours stay
   } else {                                               // no photo: plain paper with the words
     g.fillStyle = "#f3e6a8"; g.fillRect(x, y, S, S);
     g.fillStyle = "#222"; g.font = "32px Helvetica, Arial, sans-serif";
@@ -72,6 +73,21 @@ function paintNote(n) {
   const m = n.__note.material;
   if (m.map) m.map.dispose();
   m.map = tex; m.opacity = 1; m.needsUpdate = true;
+}
+// If a photo was taken in poor light, lift its brightness so the paper looks like paper again.
+// Same factor for red, green and blue, so a yellow note stays yellow (only brighter). Max ×1.8.
+function brighten(g, x, y, S) {
+  if (!CONFIG.BRIGHTEN_NOTES) return;
+  try {
+    const img = g.getImageData(x, y, S, S), d = img.data, lum = [];
+    for (let i = 0; i < d.length; i += 16) lum.push(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+    lum.sort((a, b) => a - b);
+    const paper = lum[Math.floor(lum.length * 0.9)] || 255;           // the bright 10%: the paper
+    const k = Math.min(1.8, CONFIG.BRIGHTEN_TO / paper);
+    if (k <= 1.03) return;                                              // already bright enough
+    for (let i = 0; i < d.length; i += 4) { d[i] = Math.min(255, d[i] * k); d[i + 1] = Math.min(255, d[i + 1] * k); d[i + 2] = Math.min(255, d[i + 2] * k); }
+    g.putImageData(img, x, y);
+  } catch (e) {}                                                        // a photo from another site can't be read: leave it
 }
 function wrapText(ctx, text, maxWidth) {
   const words = String(text).split(" "), lines = [];
@@ -164,7 +180,7 @@ function tween(ms, fn, ease = easeInOut) {
 //  GRAPH
 // ============================================================
 // "orbit" controls: drag = rotate, right-drag = move, pinch = zoom (scroll is handled below: it turns the map)
-const graph = ForceGraph3D({ controlType: "orbit" })($("map"));
+const graph = ForceGraph3D({ controlType: "trackball" })($("map"));   // trackball: the map turns freely, also over the top
 graph.width(window.innerWidth).height(window.innerHeight)
   .backgroundColor(CONFIG.BG_COLOR || "#ffffff")
   .showNavInfo(false)
@@ -182,22 +198,28 @@ graph.cameraPosition({ x: 0, y: 0, z: CONFIG.MAX_ZOOM * 1.8 });    // intro star
 
 // zoom goes toward where the mouse points, so far-away notes are easy to reach
 const controls = graph.controls();
-controls.zoomToCursor = CONFIG.ZOOM_TO_MOUSE;   // false = zoom toward the middle, so the map stays centered
-controls.screenSpacePanning = true;
+controls.rotateSpeed = 2.4;           // finger / right-drag turning
+controls.panSpeed = 0.9;
+controls.dynamicDampingFactor = 0.15;  // a little glide after you let go
 // laptop: click and drag MOVES the map (shifts the center); two fingers on the trackpad turn it (see below);
 // right-click and drag also turns it. Phones keep one finger = turn, two fingers = pinch zoom / move.
 controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
 // don't let the center wander off into empty space: keep it inside the cloud
 controls.addEventListener("change", () => {
+  if (selected || performance.now() < camTweenUntil) return;          // only when YOU move it (not while flying to a note)
   const t = controls.target, max = CONFIG.MAP_RADIUS * 1.2, d = t.length();
   if (d > max) { const back = t.clone().multiplyScalar(max / d).sub(t); t.add(back); graph.camera().position.add(back); }
 });
 controls.zoomSpeed = CONFIG.ZOOM_SPEED;
 controls.minDistance = 15;          // how close you can get to a note
 controls.maxDistance = 1200;
-controls.autoRotate = CONFIG.DRIFT_SPEED > 0;   // slow turn to the right on load, until someone touches the map
+// the slow turn to the right (our own, see glide): it pauses while you touch, drag or scroll,
+// and comes back DRIFT_RESUME ms after you stop
+controls.autoRotate = CONFIG.DRIFT_SPEED > 0;
 controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
-controls.addEventListener("start", () => (controls.autoRotate = false));
+let lastTouch = 0;
+function touched() { controls.autoRotate = false; lastTouch = performance.now(); }
+controls.addEventListener("start", touched);
 
 // ---- scroll turns the map, pinch zooms (smoothly) ----
 // Scroll up/down (mouse wheel or two fingers on the trackpad) tilts the map up/down,
@@ -223,7 +245,7 @@ $("map").addEventListener("wheel", e => {
   e.preventDefault();
   e.stopPropagation();                                   // the orbit controls never see it: scroll no longer zooms
   if (mapBusy()) return;
-  controls.autoRotate = false;
+  touched();
   const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? innerHeight : 1;   // lines / pages → pixels
   const dx = e.deltaX * unit, dy = e.deltaY * unit;
   if (e.ctrlKey) {                                       // trackpad pinch (Chrome, Firefox) or Ctrl + wheel
@@ -239,33 +261,38 @@ $("map").addEventListener("gesturestart", e => { e.preventDefault(); gestureFrom
 $("map").addEventListener("gesturechange", e => {
   e.preventDefault();
   if (mapBusy()) return;
-  controls.autoRotate = false;
+  touched();
   const s = e.scale || 1;
   zoomBy(Math.pow(gestureFrom / s, CONFIG.ZOOM_SPEED));
   gestureFrom = s;
 });
-// every frame: apply part of what is left of the turn, tilt and zoom, easing out
-const TILT_MIN = Math.PI / 2 - 0.9, TILT_MAX = Math.PI / 2 + 0.9;
-const _off = new THREE.Vector3(), _sph = new THREE.Spherical();
+// every frame: apply part of what is left of the turn, tilt and zoom, easing out.
+// Turning goes around the camera's own up and side axes, so it never stops at the top or bottom of the map.
+const _off = new THREE.Vector3(), _axis = new THREE.Vector3(), _q = new THREE.Quaternion();
 function glide() {
-  const cam = graph.camera(), t = controls.target;
-  if (turnLeft || tiltLeft || zoomGoal !== null) {
+  const cam = graph.camera(), t = controls.target, now = performance.now();
+  // the drift comes back after a few seconds without touching (not while a note or a page is open)
+  if (!controls.autoRotate && CONFIG.DRIFT_SPEED > 0 && $("tour").hidden && !selected && now - lastTouch > (CONFIG.DRIFT_RESUME ?? 4000)
+      && !document.body.classList.contains("page-open")) { controls.autoRotate = true; controls.autoRotateSpeed = CONFIG.DRIFT_SPEED; }
+  const drift = controls.autoRotate && !selected && now >= camTweenUntil ? -(2 * Math.PI / 3600) * controls.autoRotateSpeed : 0;
+  if (turnLeft || tiltLeft || zoomGoal !== null || drift) {
     _off.copy(cam.position).sub(t);
-    _sph.setFromVector3(_off);
-    const turn = turnLeft * 0.1, tilt = tiltLeft * 0.08;
-    turnLeft -= turn; tiltLeft -= tilt;
+    const turn = turnLeft * 0.1 + drift, tilt = tiltLeft * 0.08;
+    turnLeft -= turnLeft * 0.1; tiltLeft -= tiltLeft * 0.08;
     if (Math.abs(turnLeft) < 0.0002) turnLeft = 0;
     if (Math.abs(tiltLeft) < 0.0002) tiltLeft = 0;
-    _sph.theta += turn;
-    const phi = _sph.phi + tilt;                          // stop at the top / bottom limit (never pushes further out)
-    if (tilt > 0) _sph.phi = Math.max(_sph.phi, Math.min(phi, TILT_MAX));
-    else if (tilt < 0) _sph.phi = Math.min(_sph.phi, Math.max(phi, TILT_MIN));
-    if ((tilt > 0 && _sph.phi >= TILT_MAX) || (tilt < 0 && _sph.phi <= TILT_MIN)) tiltLeft = 0;
-    if (zoomGoal !== null) {
-      _sph.radius += (zoomGoal - _sph.radius) * 0.16;    // glide toward the zoom, no jumps
-      if (Math.abs(zoomGoal - _sph.radius) < 0.05) { _sph.radius = zoomGoal; zoomGoal = null; }
+    const up = cam.up.clone().normalize();
+    if (turn) _off.applyAxisAngle(up, turn);                              // left / right
+    if (tilt) {                                                           // up / down, all the way around
+      _axis.crossVectors(up, _off).normalize();
+      _q.setFromAxisAngle(_axis, tilt);
+      _off.applyQuaternion(_q); cam.up.applyQuaternion(_q);
     }
-    _off.setFromSpherical(_sph);
+    if (zoomGoal !== null) {
+      const r = _off.length(), r2 = r + (zoomGoal - r) * 0.16;          // glide toward the zoom, no jumps
+      _off.setLength(Math.abs(zoomGoal - r2) < 0.05 ? zoomGoal : r2);
+      if (Math.abs(zoomGoal - r2) < 0.05) zoomGoal = null;
+    }
     cam.position.copy(t).add(_off);
     cam.lookAt(t);
   }
@@ -334,6 +361,7 @@ function fitCamera(ms = 1200) {
   const fitH = r / (Math.tan(fov / 2) * aspect);                   // fit left-to-right
   let z = Math.min(CONFIG.MAX_ZOOM, Math.max(CONFIG.START_ZOOM, Math.max(fitV, fitH) * 1.1));
   if (isPhone() && CONFIG.PHONE_START_ZOOM) z = CONFIG.PHONE_START_ZOOM;   // phones: start up close (whole map doesn't fit anyway)
+  else if (!isPhone() && CONFIG.LAPTOP_START_ZOOM) z = CONFIG.LAPTOP_START_ZOOM;   // laptops: start closer than "whole map"
   graph.cameraPosition({ x: 0, y: 0, z }, { x: 0, y: 0, z: 0 }, ms);
 }
 
