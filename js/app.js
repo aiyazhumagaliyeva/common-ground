@@ -195,7 +195,7 @@ controls.addEventListener("change", () => {
 controls.zoomSpeed = CONFIG.ZOOM_SPEED;
 controls.minDistance = 15;          // how close you can get to a note
 controls.maxDistance = 1200;
-controls.autoRotate = true;           // slow drift until someone touches the map
+controls.autoRotate = CONFIG.DRIFT_SPEED > 0;   // slow turn to the right on load, until someone touches the map
 controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
 controls.addEventListener("start", () => (controls.autoRotate = false));
 
@@ -332,7 +332,8 @@ function fitCamera(ms = 1200) {
   const aspect = window.innerWidth / window.innerHeight;
   const fitV = r / Math.tan(fov / 2);                              // fit top-to-bottom
   const fitH = r / (Math.tan(fov / 2) * aspect);                   // fit left-to-right
-  const z = Math.min(CONFIG.MAX_ZOOM, Math.max(CONFIG.START_ZOOM, Math.max(fitV, fitH) * 1.1));
+  let z = Math.min(CONFIG.MAX_ZOOM, Math.max(CONFIG.START_ZOOM, Math.max(fitV, fitH) * 1.1));
+  if (isPhone() && CONFIG.PHONE_START_ZOOM) z = CONFIG.PHONE_START_ZOOM;   // phones: start up close (whole map doesn't fit anyway)
   graph.cameraPosition({ x: 0, y: 0, z }, { x: 0, y: 0, z: 0 }, ms);
 }
 
@@ -378,7 +379,6 @@ function closeNote() {
   clearTimeout(openViewTimer);
   hideNoteView();
   setTimeout(() => { if (!selected) restorePivot(); }, 1150);   // once the camera has arrived
-  setTimeout(() => { if (!selected) controls.autoRotate = CONFIG.DRIFT_SPEED > 0; }, 500);   // after the note is back on the map
 }
 // ---- clicking notes (our own, more reliable than the library's) ----
 // The library counted a click only if the mouse didn't move at all (a hand on a trackpad always moves 1–2 px),

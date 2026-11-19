@@ -40,6 +40,7 @@ export const CONFIG = {
   NOTE_SIZE: 15,           // size of one note in 3D
   START_ZOOM: 250,        // closest the camera starts (smaller = closer)
   MAX_ZOOM: 400,          // farthest it starts, when there are many notes
+  PHONE_START_ZOOM: 170,  // phones: how close the map starts (smaller = closer; 0 = same as laptops)
   MAX_PIXEL_RATIO: 1.5,   // sharpness on Retina screens: 2 = sharpest but laggy, 1 = smoothest but softer
   ZOOM_TO_MOUSE: false,   // true = zoom toward the mouse (map can drift off-center); false = zoom toward the middle
   ZOOM_SPEED: 1.4,        // how fast pinching zooms (1 = normal)
@@ -53,7 +54,7 @@ export const CONFIG = {
   // PREVIEW ONLY: white placeholder responses on these notes, to judge the layout. Set to {} before launch.
   RESPONSE_PREVIEW: {},
   TOUR_SHOW: "never",       // walkthrough shows by itself: "every-visit" (each new visit), "first-visit" (once per browser), "never" (only with ?)
-  DRIFT_SPEED: 0,         // slow turning of the map until someone touches it (0 = off; was 0.15)
+  DRIFT_SPEED: 0.35,      // slow turn to the right when the map loads, stops at the first touch/scroll (0 = off)
   FLOAT: 0,               // how much the notes bob up and down (0 = still)
   ARRIVE_SCALE: 1.65,     // how big a new note is when it flies in
   ARRIVE_HOLD: 1200,      // ms you get to see a new note big before it shrinks to its place
