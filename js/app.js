@@ -199,8 +199,8 @@ graph.cameraPosition({ x: 0, y: 0, z: CONFIG.MAX_ZOOM * 1.8 });    // intro star
 // zoom goes toward where the mouse points, so far-away notes are easy to reach
 const controls = graph.controls();
 controls.rotateSpeed = 2.4;           // finger / right-drag turning
-controls.panSpeed = 0.9;
-controls.dynamicDampingFactor = 0.15;  // a little glide after you let go
+controls.panSpeed = CONFIG.DRAG_SPEED ?? 0.1;            // click and drag: how far the map moves
+controls.dynamicDampingFactor = CONFIG.DRAG_STOP ?? 0.3;  // how fast it stops after you let go (higher = sooner)
 // laptop: click and drag MOVES the map (shifts the center); two fingers on the trackpad turn it (see below);
 // right-click and drag also turns it. Phones keep one finger = turn, two fingers = pinch zoom / move.
 controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
