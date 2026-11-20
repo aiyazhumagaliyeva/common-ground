@@ -236,7 +236,16 @@
     .about ol { margin-top: 1.2em; }
     .about .privacy { margin-top: 1.2em; font-size: max(13px, calc(15 * var(--k))); color: rgba(0,0,0,0.5); }
     .about a { color: inherit; }
-    .about .text p.gapTop { margin-top: 1.2em; }
+    .about .text p.gapTop, .about .text p + p.tight.gapTop { margin-top: 1.2em; }
+    .about ol.flat { margin-top: 0; }
+    /* laptops: exactly the Figma sizes (text 20, headings 24, title 32, column 679), not scaled with the window */
+    @media (min-width: 901px) {
+      #aboutPage .about { width: min(679px, 90vw); margin-top: 23px; gap: 35px; padding-bottom: 160px; }
+      #aboutPage .about p, #aboutPage .about li { font-size: 20px; }
+      #aboutPage .about h2 { font-size: 24px; }
+      #aboutPage h1.aboutTitle { font-size: 32px; margin-top: 77px; gap: 14px; }
+      #aboutPage h1.aboutTitle img { width: 352px; }
+    }
     /* "About" + the sticky-note logo on one line (Figma: logo 357 wide, 77 from the top) */
     #aboutPage h1.aboutTitle { display: flex; align-items: center; justify-content: center; gap: calc(14 * var(--k));
       margin-top: calc(77 * var(--k)); }
@@ -414,14 +423,19 @@
       <img class="ph" loading="lazy" src="about/v2-inspo.jpg" alt="TensorFlow Projector, Before I Die and This Exquisite Forest" style="aspect-ratio:679/189">
       <div class="text">
         <p>This project, like any other, started with research. After settling on the idea of exploring how people choose to interact with the digital space, I decided to find other artists and designers exploring similar areas through their craft.</p>
-        <p class="tight">I took a lot of inspiration from projects like:</p>
+        <p class="tight gapTop">I took a lot of inspiration from projects like:</p>
         <p class="tight"><a href="https://projector.tensorflow.org/" target="_blank" rel="noopener">TensorFlow Projector</a> (1),</p>
         <p class="tight"><a href="https://www.candychang.com/beforeidie/" target="_blank" rel="noopener">Before I Die by Candy Chang</a> (2) and</p>
         <p class="tight"><a href="https://experiments.withgoogle.com/this-exquisite-forest" target="_blank" rel="noopener">This Exquisite Forest by Aaron Koblin and Chris Milk</a> (3).</p>
       </div>
+      <img class="ph" loading="lazy" src="about/v2-survey.jpg" alt="Survey results: 54% of people have thoughts they want to share but keep to themselves. 89% felt understood or less alone after a stranger's story. 57% said connecting feels hard because conversations feel superficial." style="aspect-ratio:679/415; background:#fff">
+      <div class="text">
+        <p>The next step in the project was research. I created a survey and got 37 people to respond on the topics of how people connect, what makes them feel understood, and a question on kinds of thoughts people might not always share with others.</p>
+      </div>
       <img class="ph" loading="lazy" src="about/v2-notes.jpg" alt="Sticky notes with wishes" style="aspect-ratio:679/368">
       <div class="text">
-        <p>The reason I chose handwritten notes is that handwritten notes can translate a much more personal feeling and make it easier for people to connect. In the time of AI and technology, I felt that the sensibility of a handwriting and a paper texture carries a special value. Posting a hand-written note slows people down, making every note feel valuable. The first notes were collected in person on paper sticky notes (late October-early November 2026).</p>
+        <p>Then came the actual process. I bought 2400 sticky notes and handed them to people around me to fill in with the prompt of “I wish I could...”</p>
+        <p>I chose handwritten notes because they are more personal and physical, something we miss a lot in the time of AI and technology. Posting a hand-written note slows people down, making every note feel valuable. The first notes were collected in person on paper sticky notes (late October-early November 2026).</p>
       </div>
       <img class="ph" loading="lazy" src="about/v2-writing.jpg" alt="Someone writing a wish on a sticky note" style="aspect-ratio:677/355">
 
@@ -432,7 +446,7 @@
         <ol>
           <li>You write your wish on paper and scan the QR code with your phone.</li>
           <li>AI reads your handwriting (Google Cloud Vision), and you check that it read it correctly.</li>
-          <li>Your note is sent to be reviewed by our moderator. Everyone else sees it once it's approved.</li>
+          <li>Your note is sent to the map.</li>
           <li>A second AI model reads what your wish means. It turns each wish into numbers that describe its meaning, and it runs in your browser.</li>
           <li>Your note is placed near notes with a similar meaning. As more notes appear, groups start to form based on submitted notes. Groups form from a minimum of 3 wishes to start a group.</li>
         </ol>
@@ -452,20 +466,24 @@
       <h2>Care and privacy</h2>
       <div class="text">
         <p class="tight">All notes are anonymous. Please don't include names or contact details.</p>
-        <p class="tight">Every submission is reviewed by me before it appears on the map.</p>
-        <p class="tight gapTop">Notes that could reveal personal information are never made public.</p>
-        <p class="tight">Notes about self-harm are never posted. The writer is shown where to find support instead.</p>
-        <p class="tight">Visits are counted anonymously for research: where people came from and what they click, with no names or exact location.</p>
+        <p class="tight">I review every note and remove anything that breaks these rules.</p>
+        <ol>
+          <li>Notes that could reveal personal information are never made public.</li>
+          <li>Notes about self-harm are never posted. The writer is shown where to find support instead.</li>
+          <li>Visits are counted anonymously for research: where people came from and what they click, with no names or exact location.</li>
+        </ol>
         <p class="privacy">Visits are counted with Microsoft Clarity, which may use cookies. <a href="https://privacy.microsoft.com/privacystatement" target="_blank" rel="noopener">How Microsoft uses this data</a> · <button type="button" id="optOut" class="linkBtn">Don’t count my visits</button></p>
       </div>
 
       <h2>Inspirations</h2>
       <div class="text">
-        <p class="tight">Before I Die by Candy Chang (2011): a public chalkboard wall in New Orleans, now in over 75 countries.</p>
-        <p class="tight">Subway Therapy by Matthew Chavez (2016): sticky notes in NYC subway stations.</p>
-        <p class="tight">We Feel Fine by Jonathan Harris and Sep Kamvar (2006).</p>
-        <p class="tight">This Exquisite Forest by Aaron Koblin and Chris Milk (Google).</p>
-        <p class="tight">Google's TensorFlow Embedding Projector.</p>
+        <ol class="flat">
+          <li>Before I Die by Candy Chang (2011): a public chalkboard wall in New Orleans, now in over 75 countries.</li>
+          <li>Subway Therapy by Matthew Chavez (2016): sticky notes in NYC subway stations.</li>
+          <li>We Feel Fine by Jonathan Harris and Sep Kamvar (2006).</li>
+          <li>This Exquisite Forest by Aaron Koblin and Chris Milk (Google).</li>
+          <li>Google's TensorFlow Embedding Projector.</li>
+        </ol>
       </div>
 
       <h2>About me</h2>
