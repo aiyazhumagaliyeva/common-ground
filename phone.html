@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#000000">
   <title>Common Ground — add your note</title>
   <style>
@@ -94,6 +94,7 @@
       font-size: calc(14 * var(--k)); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
     }
     /* zoom chip "1x" (Figma: 38 circle at 178 / 464, black 60%, gold 13px) */
+    html, body { touch-action: manipulation; }   /* no double-tap zoom; taps on buttons stay instant */
     #zoomChip { all: unset; position: absolute; cursor: pointer; touch-action: none; left: calc(178 * var(--k)); top: calc(429 * var(--k));
       width: calc(38 * var(--k)); height: calc(38 * var(--k)); border-radius: 50%; background: rgba(0,0,0,0.6);
       display: grid; place-items: center; color: #e9c94f; font-size: calc(13 * var(--k)); font-weight: 600; z-index: 3; }
@@ -403,6 +404,11 @@
       if (pinch && e.touches.length === 2) { e.preventDefault(); setZoom(pinch.z * dist(e.touches) / pinch.d); }
     }, { passive: false });
     $("window").addEventListener("touchend", () => { if (pinch) setTimeout(() => (pinch = null), 50); });
+    // the page itself never zooms: a pinch anywhere outside the camera window does nothing
+    // (iPhone Safari ignores "user-scalable=no", so its own pinch and double-tap zoom are blocked here too)
+    ["gesturestart", "gesturechange", "gestureend"].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
+    document.addEventListener("touchmove", e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+
 
     // tap the window: focus there (when the phone allows it) + a yellow square
     $("window").addEventListener("click", e => {
