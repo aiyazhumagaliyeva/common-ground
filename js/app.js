@@ -202,6 +202,9 @@ graph.cameraPosition({ x: 0.01, y: 0, z: (CONFIG.LAPTOP_START_ZOOM || CONFIG.STA
 const controls = graph.controls();
 controls.rotateSpeed = 2.4;           // finger / right-drag turning
 controls.panSpeed = CONFIG.DRAG_SPEED ?? 0.1;            // click and drag: how far the map moves
+// phones: the map is locked to its center. One finger turns it around the center, pinch zooms; it never slides away.
+const TOUCH_FIRST = matchMedia("(pointer: coarse)").matches;
+if (TOUCH_FIRST && CONFIG.PHONE_LOCK_CENTER !== false) controls.noPan = true;
 controls.dynamicDampingFactor = CONFIG.DRAG_STOP ?? 0.3;  // how fast it stops after you let go (higher = sooner)
 // laptop: click and drag MOVES the map (shifts the center); two fingers on the trackpad turn it (see below);
 // right-click and drag also turns it. Phones keep one finger = turn, two fingers = pinch zoom / move.
@@ -390,6 +393,12 @@ function flyTo(node, ms = 1500) {
 let pivotDepth = 0;
 function restorePivot() {
   if (!pivotDepth) return;
+  if (TOUCH_FIRST && CONFIG.PHONE_LOCK_CENTER !== false) {   // phones: glide back to turning around the map's center
+    pivotDepth = 0;
+    const p = graph.camera().position;
+    graph.cameraPosition({ x: p.x, y: p.y, z: p.z }, { x: 0, y: 0, z: 0 }, 700);
+    return;
+  }
   const cam = graph.camera().position, look = controls.target.clone().sub(cam).normalize();
   controls.target.copy(cam.clone().addScaledVector(look, pivotDepth));
   pivotDepth = 0;
@@ -722,7 +731,9 @@ async function arrive(data) {
   await wait(CONFIG.ARRIVE_HOLD);
 
   // 4. step back a little while it shrinks to its normal size (it stays in the middle, with its neighbours around it)
-  graph.cameraPosition(T.clone().addScaledVector(out, D * 1.5), T, 1400);
+  // the camera, the note and the map's center are on one line, so looking at the center keeps the note in the middle
+  // and the map keeps turning around its own center afterwards
+  graph.cameraPosition(T.clone().addScaledVector(out, D * 1.5), { x: 0, y: 0, z: 0 }, 1400);
   await tween(1400, e => node.__group.scale.setScalar(CONFIG.ARRIVE_SCALE + (1 - CONFIG.ARRIVE_SCALE) * e));
   node.__arriving = false;
   node.__pos = null;
