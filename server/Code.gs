@@ -8,7 +8,8 @@
 //   5. saves anonymous visit events to the "events" tab (research)
 // ============================================================
 
-const VERSION = 10;   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
+const VERSION = 11;   // 11 = photos that aren't a note are rejected
+// (was 10)   // 5 = responses (replyTo column)   // the website checks this to know the script is up to date
 
 const SHEET_NAME = "notes";
 const HEADERS = ["id", "createdAt", "status", "flag", "text", "allowReplies", "color", "image", "session", "source", "replyTo"];
@@ -20,6 +21,7 @@ const AUTO_APPROVE = true;    // true = safe notes and responses go live right a
 const DIGEST_EVERY = 10;      // email me a summary after this many new notes + responses
 const REJECT_GIBBERISH = true;    // test notes like "vhfbglsjfnv" are rejected automatically
 const REJECT_FACES = true;        // photos with a person's face are rejected automatically (keeps everyone anonymous)
+const REJECT_NOT_NOTES = true;    // photos that aren't a note (an outfit, a room, a pet…) are rejected automatically
 
 function getSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -141,8 +143,12 @@ function saveNote(body) {
   // checks: safety words → gibberish → a face in the photo
   let flag = checkNote(text);
   if (flag === "ok" && REJECT_GIBBERISH && looksLikeGibberish(text)) flag = "gibberish";
-  if (flag === "ok" && REJECT_FACES && image && hasFace(image)) flag = "person-in-photo";
-  const autoReject = flag === "gibberish" || flag === "person-in-photo";
+  if (flag === "ok" && image && (REJECT_FACES || REJECT_NOT_NOTES)) {
+    const photo = checkPhoto(image, body.read);
+    if (REJECT_FACES && photo.face) flag = "person-in-photo";
+    else if (REJECT_NOT_NOTES && photo.notANote) flag = "not-a-note";
+  }
+  const autoReject = flag === "gibberish" || flag === "person-in-photo" || flag === "not-a-note";
   const status = flag === "ok" ? (AUTO_APPROVE ? "approved" : "pending") : autoReject ? "rejected" : "flagged";
   const session = String(body.session || "").replace(/[^a-z0-9]/gi, "").slice(0, 20);
   const source = String(body.source || "").replace(/[^a-z0-9\-_]/gi, "").slice(0, 60);
@@ -205,19 +211,35 @@ function looksLikeGibberish(text) {
 }
 
 // A person in the photo: Google Cloud Vision face detection (same key as the handwriting reading)
-function hasFace(dataUrl) {
+// One Google Vision call looks at the photo three ways: a face? what is in it (labels)? any writing?
+// A note passes if Vision sees paper / handwriting / a sticky note, or reads a real sentence (10+ letters).
+// An outfit, a room, a pet… has none of these → "not-a-note". If the check itself fails, the note is NOT blocked.
+// "read" = what the phone's handwriting reader found on the full-size photo (helps with faint pencil).
+const NOTE_LABELS = ["paper", "handwriting", "font", "post-it note", "sticky note", "paper product", "office supplies",
+  "note", "text", "writing", "document", "letter", "calligraphy", "ink", "stationery", "notebook", "rectangle", "parallel"];
+function checkPhoto(dataUrl, read) {
   try {
     const b64 = String(dataUrl).split(",")[1];
-    if (!b64) return false;
+    if (!b64) return { face: false, notANote: false };
     const key = PropertiesService.getScriptProperties().getProperty("VISION_API_KEY");
     const res = UrlFetchApp.fetch("https://vision.googleapis.com/v1/images:annotate?key=" + key, {
       method: "post", contentType: "application/json", muteHttpExceptions: true,
-      payload: JSON.stringify({ requests: [{ image: { content: b64 }, features: [{ type: "FACE_DETECTION", maxResults: 3 }] }] })
+      payload: JSON.stringify({ requests: [{ image: { content: b64 }, features: [
+        { type: "FACE_DETECTION", maxResults: 3 }, { type: "LABEL_DETECTION", maxResults: 15 }, { type: "TEXT_DETECTION" }] }] })
     });
     const r = (JSON.parse(res.getContentText()).responses || [])[0] || {};
-    return (r.faceAnnotations || []).some(f => f.detectionConfidence >= 0.6);
-  } catch (e) { return false; }           // if the check fails, don't block the note
+    if (r.error) return { face: false, notANote: false };
+    const face = (r.faceAnnotations || []).some(f => f.detectionConfidence >= 0.6);
+    return { face: face, notANote: !looksLikeANote(r, read) };
+  } catch (e) { return { face: false, notANote: false }; }
 }
+function looksLikeANote(r, read) {
+  const letters = t => (String(t || "").match(/[a-z]/gi) || []).length;
+  const text = (r.fullTextAnnotation && r.fullTextAnnotation.text) || ((r.textAnnotations || [])[0] || {}).description || "";
+  if (letters(text) >= 10 || letters(read) >= 10) return true;      // a real sentence (a logo word alone isn't enough)
+  return (r.labelAnnotations || []).some(l => l.score >= 0.6 && NOTE_LABELS.indexOf(String(l.description).toLowerCase()) >= 0);
+}
+function hasFace(dataUrl) { return checkPhoto(dataUrl).face; }   // kept for older code
 
 // ---------- emails ----------
 function sheetLink() { return SpreadsheetApp.getActiveSpreadsheet().getUrl(); }

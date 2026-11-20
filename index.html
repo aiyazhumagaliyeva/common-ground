@@ -17,12 +17,17 @@
       font-family: Inter, sans-serif;
       background-color: #ffffff;      /* same as BG_COLOR in js/config.js */
     }
+    /* the home screen never scrolls or rubber-bands (iPhone Safari slid the whole page a little, hiding the name
+       at the top and leaving white space under the menu). Pages (About, Add a note) scroll inside themselves. */
+    html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+    body { position: fixed; inset: 0; width: 100%; }
 
     /* ---------- MAP (back layer, full screen) ---------- */
     #map {
       position: fixed;
       top: 0;
       left: 0;
+      touch-action: none;             /* fingers move the map, never the page */
     }
 
     /* ---------- NOTE VIEW (Figma home-response-flow-1/2/3): veil #262626 40%, note 432 × 429, responses 176 × 175 ---------- */
@@ -164,7 +169,7 @@
     /* ---------- ADD A NOTE (Figma: add yours-new) ---------- */
     .steps {
       width: min(calc(1272 * var(--k)), 92vw); margin: calc(86 * var(--k)) auto calc(60 * var(--k));
-      display: grid; grid-template-columns: repeat(3, 1fr);
+      display: grid; grid-template-columns: 374fr 419fr 399fr;   /* Figma column widths (1272 in total with the gaps) */
       column-gap: calc(40 * var(--k)); row-gap: calc(54 * var(--k));
       align-items: start;
     }
@@ -181,8 +186,9 @@
     .step .pic img { max-height: 100%; }
     .step p {
       text-align: center; text-wrap: pretty; line-height: normal; margin-top: calc(20 * var(--k));
-      font-size: max(14px, calc(20 * var(--k))); max-width: calc(400 * var(--k));
+      font-size: max(14px, calc(20 * var(--k))); max-width: 100%;
     }
+    .steps > .step:first-child p { max-width: calc(265 * var(--k)); }   /* Figma: step 1's text is narrower */
     .qrCard { display: flex; flex-direction: column; align-items: center; gap: calc(17 * var(--k)); align-self: center; }
     /* Figma (add yours-new, Frame 27): just the QR, 218 × 218, no card */
     .qrCard .box { display: flex; flex-direction: column; min-width: calc(218 * var(--k)); min-height: calc(218 * var(--k)); }

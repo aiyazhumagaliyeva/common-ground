@@ -276,7 +276,9 @@ function glide() {
   // the drift comes back after a few seconds without touching (not while a note or a page is open)
   if (!controls.autoRotate && CONFIG.DRIFT_SPEED > 0 && $("tour").hidden && !selected && now - lastTouch > (CONFIG.DRIFT_RESUME ?? 4000)
       && !document.body.classList.contains("page-open")) { controls.autoRotate = true; controls.autoRotateSpeed = CONFIG.DRIFT_SPEED; }
-  const drift = controls.autoRotate && !selected && now >= camTweenUntil ? -(2 * Math.PI / 3600) * controls.autoRotateSpeed : 0;
+  const arriving = notes.some(n => n.__arriving);            // a new note is flying in: hold still
+  if (arriving) lastTouch = now;
+  const drift = controls.autoRotate && !selected && !arriving && now >= camTweenUntil ? -(2 * Math.PI / 3600) * controls.autoRotateSpeed : 0;
   if (turnLeft || tiltLeft || zoomGoal !== null || drift) {
     _off.copy(cam.position).sub(t);
     const turn = turnLeft * 0.1 + drift, tilt = tiltLeft * 0.08;
@@ -609,6 +611,7 @@ async function startHandoff() {
     if (data.flag === "self-harm") { pillMessage("Thank you. This note won’t be posted. Please check your phone."); return; }
     if (data.flag === "gibberish") { pillMessage("We couldn’t read that note. Please try again with a clearer photo."); return; }
     if (data.flag === "person-in-photo") { pillMessage("That photo has a person in it, so it wasn’t posted. Please photograph just the note."); return; }
+    if (data.flag === "not-a-note") { pillMessage("That photo doesn’t look like a note, so it wasn’t posted. Please photograph your handwritten note."); return; }
     if (data.flag && data.flag !== "ok") { pillMessage("Thank you. Your note will be checked before it appears."); return; }
     $("handoffPill").hidden = true;
     hidePages();
@@ -712,20 +715,19 @@ async function arrive(data) {
   node.__pos = S.clone();
   graph.graphData({ nodes: notes, links: [] });
   await wait(60);
+  if (node.__note) node.__note.renderOrder = 5;        // your own new note is drawn on top of the others (until reload)
   await tween(1100, e => node.__pos.lerpVectors(S, T, e), easeOut);
 
   // 3. a second to read it
   await wait(CONFIG.ARRIVE_HOLD);
 
-  // 4. zoom out while it shrinks to its normal size
-  graph.cameraPosition(T.clone().addScaledVector(out, D * 2.6), T, 1400);
+  // 4. step back a little while it shrinks to its normal size (it stays in the middle, with its neighbours around it)
+  graph.cameraPosition(T.clone().addScaledVector(out, D * 1.5), T, 1400);
   await tween(1400, e => node.__group.scale.setScalar(CONFIG.ARRIVE_SCALE + (1 - CONFIG.ARRIVE_SCALE) * e));
   node.__arriving = false;
   node.__pos = null;
 
-  // 5. step back to see the whole map
-  await wait(500);
-  fitCamera(1800);
+  // 5. stay here, near the new note (not back to where you were): the map turns slowly around it
   return node;
 }
 

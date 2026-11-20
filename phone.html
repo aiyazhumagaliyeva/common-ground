@@ -61,6 +61,17 @@
       width: calc(244 * var(--k)); height: calc(267 * var(--k));
     }
     #still { width: 100%; height: 100%; object-fit: cover; display: none; }
+    /* camera guide (Figma phone-camera): a dashed square where the note goes, and a faint "I wish I could..." */
+    #guide {
+      position: absolute; left: calc(41 * var(--k)); top: calc(62 * var(--k));
+      width: calc(287 * var(--k)); height: calc(296 * var(--k));
+      border: 2px dashed #fff; border-radius: calc(20 * var(--k)); opacity: 0.3; pointer-events: none;
+    }
+    #guide span {
+      position: absolute; left: 0; right: 0; top: calc(71 * var(--k)); text-align: center; color: #fff;
+      font-family: "Caveat", "Bradley Hand", "Marker Felt", cursive; font-weight: 700; font-size: calc(30 * var(--k));
+    }
+    body.reviewing #guide { display: none; }
     body.reviewing #still { display: block; }
 
     /* ---------- camera step ---------- */
@@ -201,6 +212,8 @@
       /* responding to a note: no "I wish I could" label, no reply toggle */
     body.replying #textBox b, body.replying #toggle { display: none !important; }
 </style>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&display=swap" rel="stylesheet">
 </head>
 <body>
   <video id="video" playsinline autoplay muted></video>
@@ -208,7 +221,7 @@
 
   <div id="stage">
     <a id="brand" href="index.html" aria-label="Back to the board"><img src="icons/arrow-left.svg" alt="">Common Ground</a>
-    <div id="window"><img id="still" alt="Your note"><span id="focusRing"></span></div>
+    <div id="window"><img id="still" alt="Your note"><span id="guide" aria-hidden="true"><span>I wish I could...</span></span><span id="focusRing"></span></div>
     <button id="zoomChip" aria-label="Zoom">1x</button>
 
     <!-- camera step -->
@@ -574,7 +587,7 @@
       if (REPLY) allowReplies = false;
       $("send").disabled = true; $("send").textContent = "Sending…";
       try {
-        const saved = await post({ action: "submit", text: full, image: thumb, allowReplies, color: paperColor, session: SESSION, source: SOURCE, replyTo: REPLY });
+        const saved = await post({ action: "submit", text: full, image: thumb, allowReplies, color: paperColor, read: ocrText, session: SESSION, source: SOURCE, replyTo: REPLY });
         if (saved.error) throw new Error(saved.error);
         const flag = saved.flag || checkNote(full);
         // big screen: the note flies in (only safe notes carry text and photo)
@@ -587,9 +600,10 @@
           const why = {
             "gibberish": ["We couldn’t read this note.", "Try a clearer photo, with the whole note inside the frame."],
             "person-in-photo": ["This photo wasn’t posted.", "There’s a person in it. To keep everyone anonymous, take a photo of just the note."],
+            "not-a-note": ["This doesn’t look like a note.", "Write your wish on paper or a sticky note, then take a photo of just the note."],
           }[flag] || ["Thank you!", "Your note will be checked before it appears on the board."];
           $("npTitle").textContent = why[0]; $("npText").textContent = why[1];
-          $("npAgain").hidden = !(flag === "gibberish" || flag === "person-in-photo");
+          $("npAgain").hidden = !(flag === "gibberish" || flag === "person-in-photo" || flag === "not-a-note");
           $("notPosted").classList.add("show");
           return;
         }
