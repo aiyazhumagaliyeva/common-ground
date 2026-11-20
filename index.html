@@ -125,9 +125,10 @@
 
     /* ---------- NAME + NAV PILL (Figma: home04-NEW) ---------- */
     /* "Common Ground" alone at the top left (42 / 36, bold 24) */
-    #brandTop { position: fixed; z-index: 5; left: max(20px, calc(42 * var(--k))); top: max(16px, calc(36 * var(--k)));
-      font-family: Graphik, "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; font-size: max(18px, calc(24 * var(--k)));
-      color: #000; text-decoration: none; white-space: nowrap; transition: top 0.45s ease; }
+    /* Figma home04- NEW LOGO: sticky-note logo at 22 / 20, 183 wide */
+    #brandTop { position: fixed; z-index: 5; left: max(16px, calc(22 * var(--k))); top: max(14px, calc(20 * var(--k)));
+      display: block; line-height: 0; text-decoration: none; transition: top 0.45s ease; }
+    #brandTop img { display: block; width: max(120px, calc(183 * var(--k))); height: auto; }
     body.page-open #brandTop { top: -80px; }               /* slides away on pages */
     /* the menu pill at the bottom middle (top 871 of 982, 41 tall → 70 from the bottom) */
     #nav {
@@ -255,7 +256,8 @@
       .desk { display: none !important; }
       .mob { display: revert; }
       /* Figma phone-home-NEW: name top left (15 / 23, bold 20), the same menu pill at the bottom (40 from the bottom) */
-      #brandTop { display: block; left: 15px; top: calc(23px + env(safe-area-inset-top, 0px)); font-size: 20px; }
+      #brandTop { display: block; left: 15px; top: calc(17px + env(safe-area-inset-top, 0px)); }   /* Figma phone-home-NEW LOGO: 15 / 17, 105 wide */
+      #brandTop img { width: 105px; }
       #nav { display: flex; bottom: calc(40px + env(safe-area-inset-bottom, 0px)); gap: 15px; padding: 10px 20px; border-radius: 40px; font-size: 16px; white-space: nowrap; }
       #nav .camera { width: 20px; }
       #nav .divider { height: 19px; }
@@ -318,7 +320,7 @@
     </div>
   </div>
   <!-- Figma home04-NEW: name top left, menu pill at the bottom -->
-  <a class="brand" id="brandTop" href="">Common Ground</a>
+  <a class="brand" id="brandTop" href="" aria-label="Common Ground"><img src="icons/logo.png" alt="Common Ground"></a>
   <nav id="nav">
     <button id="navAdd">Add a note
       <img class="camera" src="icons/camera.svg" alt="">
