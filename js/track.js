@@ -59,7 +59,9 @@ export function optOut() {
   queue = [];
   if (window.clarity) window.clarity("consent", false);
 }
-const enabled = () => CONFIG.TRACKING && !optedOut() && CONFIG.SERVER_URL;
+// never count local testing (Go Live on 127.0.0.1 / localhost), so the research data stays clean
+const LOCAL = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname);
+const enabled = () => CONFIG.TRACKING && !LOCAL && !optedOut() && CONFIG.SERVER_URL;
 
 // ---- sending: events are grouped and sent every few seconds ----
 let queue = [];

@@ -129,7 +129,7 @@
     #brandTop { position: fixed; z-index: 5; left: max(16px, calc(22 * var(--k))); top: max(14px, calc(20 * var(--k)));
       display: block; line-height: 0; text-decoration: none; transition: top 0.45s ease; }
     #brandTop img { display: block; width: max(120px, calc(183 * var(--k))); height: auto; }
-    body.page-open #brandTop { top: -80px; }               /* slides away on pages */
+    body.page-open #brandTop { top: -200px; }               /* slides away on pages */
     /* the menu pill at the bottom middle (top 871 of 982, 41 tall → 70 from the bottom) */
     #nav {
       position: fixed; z-index: 5; left: 50%; transform: translateX(-50%);
@@ -221,8 +221,8 @@
     /* ---------- ABOUT / CONTACT (Figma: about) ---------- */
     /* about-new: image + text sections */
     @media (min-width: 901px) { #aboutPage { --k: calc(100vw / 1512); } }   /* scrolling pages: scale by width only */
-    /* Figma "about": one 807px column, 35px between blocks, headings 24px centered, text 20px */
-    .about { width: min(calc(807 * var(--k)), 90vw); margin: calc(61 * var(--k)) auto 0;
+    /* Figma "about" (Nov 20): one 679px column, 35px between blocks, headings 24px centered, text 20px */
+    .about { width: min(calc(679 * var(--k)), 90vw); margin: calc(23 * var(--k)) auto 0;
       padding-bottom: calc(160 * var(--k));            /* space after the last image */
       display: flex; flex-direction: column; gap: calc(35 * var(--k)); }
     .about h2 { font-weight: 400; font-size: max(18px, calc(24 * var(--k))); text-align: center; text-wrap: pretty; }
@@ -236,6 +236,11 @@
     .about ol { margin-top: 1.2em; }
     .about .privacy { margin-top: 1.2em; font-size: max(13px, calc(15 * var(--k))); color: rgba(0,0,0,0.5); }
     .about a { color: inherit; }
+    .about .text p.gapTop { margin-top: 1.2em; }
+    /* "About" + the sticky-note logo on one line (Figma: logo 357 wide, 77 from the top) */
+    #aboutPage h1.aboutTitle { display: flex; align-items: center; justify-content: center; gap: calc(14 * var(--k));
+      margin-top: calc(77 * var(--k)); }
+    #aboutPage h1.aboutTitle img { width: max(200px, calc(352 * var(--k))); height: auto; display: block; }
 
     /* ---------- PHONES / NARROW SCREENS ---------- */
     @media (max-width: 800px) {
@@ -272,6 +277,8 @@
       .about h2 + .text { margin-top: -10px; }                                         /* 20 between a heading and its text */
       .about p, .about li { font-size: 16px; line-height: 1.45; }   /* more air between lines: easier to read on a narrow screen */
       .about h2 { font-size: 18px; }
+      #aboutPage h1.aboutTitle { margin-top: calc(90px + env(safe-area-inset-top, 0px)); gap: 10px; font-size: 20px; }
+      #aboutPage h1.aboutTitle img { width: 190px; }
       /* add a note: one column of steps, "Submit a note" button at the bottom */
       .steps { width: 325px; max-width: calc(100vw - 48px); margin: 40px auto 0; grid-template-columns: 1fr; row-gap: 40px; padding-bottom: 140px; }
       /* Figma phone "How to contribute": the number sits beside the drawing (same row), drawings at full size */
@@ -393,92 +400,76 @@
   <!-- ---------- ABOUT (Figma: about-new) ---------- -->
   <section class="page" id="aboutPage" aria-label="About">
     <button class="back" data-close aria-label="Back to the board"><img src="icons/back.svg" alt=""></button>
-    <h1>About Common Ground</h1>
+    <h1 class="aboutTitle">About <img src="icons/logo-line.png" alt="Common Ground"></h1>
     <div class="about">
-      <p>Common Ground is a project that lets people express themselves and connect with others through a simple set of anonymous, handwritten notes. Every note finishes the same sentence: "I wish I could…" There are no names, no likes and no followers, only wishes, and the people who recognize themselves in them.</p>
-      <img class="ph" loading="lazy" src="about/started.jpg" alt="Handwritten sticky notes">
+      <p>Common Ground is a place for people (young professionals) to connect with each other and feel belonging through a simple prompt of “I wish I could ...”</p>
+      <img class="ph" loading="lazy" src="about/v2-top.jpg" alt="Handwritten sticky notes" style="aspect-ratio:679/374">
+
+      <h2>Why</h2>
+      <div class="text">
+        <p>I am a senior at Parsons School of Design, and I love experimenting with my designs and involving the user as a part of it. A lot of my interest in the topic was rooted in interaction. It moved from interaction between the person and the computer into the interaction between people through the digital, and how exactly people interact with the digital.</p>
+      </div>
 
       <h2>How it started</h2>
+      <img class="ph" loading="lazy" src="about/v2-inspo.jpg" alt="TensorFlow Projector, Before I Die and This Exquisite Forest" style="aspect-ratio:679/189">
       <div class="text">
-        <p>While working on my thesis, I was very interested in interaction. I started by researching social media: how apps are designed to keep us scrolling, and how much of what we share online is shaped to be liked. During one brainstorming session, I came to a simple conclusion: the most memorable interactions are not between people and screens, but between people. I became curious about how I could make an interactive space that would make it easier for strangers to meet and relate to each other.</p>
-        <p>Projects like <a href="https://www.candychang.com/beforeidie/" target="_blank" rel="noopener">Before I Die by Candy Chang</a> and <a href="https://experiments.withgoogle.com/this-exquisite-forest" target="_blank" rel="noopener">This Exquisite Forest by Aaron Koblin and Chris Milk</a> inspired me to turn this into a community board. A place where people can share what they usually keep to themselves, and see how others feel.</p>
+        <p>This project, like any other, started with research. After settling on the idea of exploring how people choose to interact with the digital space, I decided to find other artists and designers exploring similar areas through their craft.</p>
+        <p class="tight">I took a lot of inspiration from projects like:</p>
+        <p class="tight"><a href="https://projector.tensorflow.org/" target="_blank" rel="noopener">TensorFlow Projector</a> (1),</p>
+        <p class="tight"><a href="https://www.candychang.com/beforeidie/" target="_blank" rel="noopener">Before I Die by Candy Chang</a> (2) and</p>
+        <p class="tight"><a href="https://experiments.withgoogle.com/this-exquisite-forest" target="_blank" rel="noopener">This Exquisite Forest by Aaron Koblin and Chris Milk</a> (3).</p>
+      </div>
+      <img class="ph" loading="lazy" src="about/v2-notes.jpg" alt="Sticky notes with wishes" style="aspect-ratio:679/368">
+      <div class="text">
         <p>The reason I chose handwritten notes is that handwritten notes can translate a much more personal feeling and make it easier for people to connect. In the time of AI and technology, I felt that the sensibility of a handwriting and a paper texture carries a special value. Posting a hand-written note slows people down, making every note feel valuable. The first notes were collected in person on paper sticky notes (late October-early November 2026).</p>
       </div>
-      <img class="ph" loading="lazy" src="about/notes.jpg" alt="" style="aspect-ratio:807/437">
-      <img class="ph" loading="lazy" src="about/writing.jpg" alt="Someone writing a wish on a sticky note" style="aspect-ratio:677/355">
+      <img class="ph" loading="lazy" src="about/v2-writing.jpg" alt="Someone writing a wish on a sticky note" style="aspect-ratio:677/355">
 
       <h2>How it works</h2>
-      <img class="ph" loading="lazy" src="about/how-it-works.jpg" alt="" style="aspect-ratio:807/511">
-      <div class="phPair">
-        <img class="ph" loading="lazy" src="about/phone-1.jpg" alt="Taking a photo of a note with a phone" style="aspect-ratio:322/225">
-        <img class="ph" loading="lazy" src="about/phone-2.jpg" alt="Checking the note on the phone" style="aspect-ratio:322/225">
-      </div>
+      <img class="ph" loading="lazy" src="about/v2-how.jpg" alt="Drawing of how a note travels from paper to the map" style="aspect-ratio:679/430">
       <div class="text">
         <p>Common Ground is built on the same logic as <a href="https://projector.tensorflow.org/" target="_blank" rel="noopener">Google's TensorFlow Embedding Projector</a>, a tool that shows how an AI groups meaning in 3D. The site reads each note, understands what it means, and places it in a 3D space next to notes with a similar meaning.</p>
         <ol>
           <li>You write your wish on paper and scan the QR code with your phone.</li>
           <li>AI reads your handwriting (Google Cloud Vision), and you check that it read it correctly.</li>
-          <li>Your note is checked automatically and appears on the map right away.</li>
+          <li>Your note is sent to be reviewed by our moderator. Everyone else sees it once it's approved.</li>
           <li>A second AI model reads what your wish means. It turns each wish into numbers that describe its meaning, and it runs in your browser.</li>
           <li>Your note is placed near notes with a similar meaning. As more notes appear, groups start to form based on submitted notes. Groups form from a minimum of 3 wishes to start a group.</li>
         </ol>
       </div>
+      <div class="phPair">
+        <img class="ph" loading="lazy" src="about/v2-phone-1.jpg" alt="Taking a photo of a note with a phone" style="aspect-ratio:335/234">
+        <img class="ph" loading="lazy" src="about/v2-phone-2.jpg" alt="Checking the note on the phone" style="aspect-ratio:335/234">
+      </div>
+      <div class="text">
+        <p>All of the notes are monitored to make sure there are no hateful or harmful comments on the website and it stays a safe space. I set up a system where every 10 notes, I receive an email and check into a connected Google Sheets document where every note is recorded.</p>
+      </div>
+      <div class="phPair">
+        <img class="ph" loading="lazy" src="about/v2-mod1.jpg" alt="The Google Sheet where every note is recorded" style="aspect-ratio:335/268">
+        <img class="ph" loading="lazy" src="about/v2-mod2.jpg" alt="The email I get every 10 notes" style="aspect-ratio:335/268">
+      </div>
 
       <h2>Care and privacy</h2>
       <div class="text">
-        <p>All notes are anonymous. Please don't include names or contact details.</p>
-        <p class="tight">Notes appear right away. Every submission is checked automatically and reviewed by me, and I remove anything that breaks these rules.</p>
-        <ul>
-          <li>Notes that could reveal personal information are never made public.</li>
-          <li>Notes about self-harm are never posted. The writer is shown where to find support instead.</li>
-          <li>Visits are counted anonymously for research: where people came from and what they click, with no names or exact location.</li>
-          <li>Visits are counted anonymously for research using Microsoft Clarity, which may use cookies. <a href="https://privacy.microsoft.com/privacystatement" target="_blank" rel="noopener">How Microsoft uses this data</a></li>
-        </ul>
-        <p class="privacy"><button type="button" id="optOut" class="linkBtn">Don’t count my visits</button></p>
-      </div>
-
-      <!-- DRAFT (written by Claude from what the site really does — edit freely) -->
-      <h2>The research</h2>
-      <div class="text">
-        <p>Common Ground is also a research project. I want to understand how strangers behave around each other's private wishes: do people read before they write, which wishes make them stop, and will they answer someone they will never meet?</p>
-        <p class="tight">To find out, the site counts what people do, anonymously. There are no names, no accounts and no exact location. I measure:</p>
-        <ul>
-          <li>Where visitors come from. Every poster, sticker, post and link has its own QR code or link, so I can see which places bring people (29 kinds, from flyers to Instagram stories).</li>
-          <li>Phone or laptop, screen size and language.</li>
-          <li>Which notes people stop on for at least a second, which ones they open, and for how long.</li>
-          <li>How many people start adding a note, take the photo, retake it, and send it.</li>
-          <li>How many people answer a note, and how many open an answer up close.</li>
-          <li>How far people get in the walkthrough.</li>
-          <li>Heatmaps and recordings of clicks and scrolling on the pages (Microsoft Clarity).</li>
-        </ul>
-        <p>You can opt out at any time with the “Don’t count my visits” button above.</p>
-      </div>
-
-      <h2>How I built it</h2>
-      <div class="text">
-        <p class="tight">I treated the site as one user journey, from a paper note in someone's hand to a note on the map, and designed every step in Figma before building it.</p>
-        <ul>
-          <li>Paper first. You write by hand and use your phone only as a camera. On a laptop, a QR code hands the job to your phone, and your note lands on the big screen the moment you send it.</li>
-          <li>A camera made for paper: zoom, light, flash and tap to focus, so the handwriting stays readable.</li>
-          <li>Checks before anything goes public. AI reads the handwriting and you confirm it. Notes that are gibberish or show a person's face are not posted. Anything flagged is emailed to me right away, and I get a summary every 10 notes.</li>
-          <li>A simple database. Every note, answer and visit goes into a Google Sheet through Google Apps Script, so I can read and moderate everything in one place.</li>
-          <li>Answers. You can respond to a note with your own photo, and answer a response, up to three in a thread.</li>
-          <li>A short walkthrough that shows how to move around the map.</li>
-        </ul>
+        <p class="tight">All notes are anonymous. Please don't include names or contact details.</p>
+        <p class="tight">Every submission is reviewed by me before it appears on the map.</p>
+        <p class="tight gapTop">Notes that could reveal personal information are never made public.</p>
+        <p class="tight">Notes about self-harm are never posted. The writer is shown where to find support instead.</p>
+        <p class="tight">Visits are counted anonymously for research: where people came from and what they click, with no names or exact location.</p>
+        <p class="privacy">Visits are counted with Microsoft Clarity, which may use cookies. <a href="https://privacy.microsoft.com/privacystatement" target="_blank" rel="noopener">How Microsoft uses this data</a> · <button type="button" id="optOut" class="linkBtn">Don’t count my visits</button></p>
       </div>
 
       <h2>Inspirations</h2>
       <div class="text">
-        <ul>
-          <li>Before I Die by Candy Chang (2011): a public chalkboard wall in New Orleans, now in over 75 countries.</li>
-          <li>Subway Therapy by Matthew Chavez (2016): sticky notes in NYC subway stations.</li>
-          <li>We Feel Fine by Jonathan Harris and Sep Kamvar (2006).</li>
-          <li>This Exquisite Forest by Aaron Koblin and Chris Milk (Google).</li>
-          <li>Google's TensorFlow Embedding Projector.</li>
-        </ul>
+        <p class="tight">Before I Die by Candy Chang (2011): a public chalkboard wall in New Orleans, now in over 75 countries.</p>
+        <p class="tight">Subway Therapy by Matthew Chavez (2016): sticky notes in NYC subway stations.</p>
+        <p class="tight">We Feel Fine by Jonathan Harris and Sep Kamvar (2006).</p>
+        <p class="tight">This Exquisite Forest by Aaron Koblin and Chris Milk (Google).</p>
+        <p class="tight">Google's TensorFlow Embedding Projector.</p>
       </div>
+
       <h2>About me</h2>
-      <img class="ph" loading="lazy" src="about/aiya.jpg" alt="Aiya">
+      <img class="ph" loading="lazy" src="about/v2-me.jpg" alt="Aiya" style="aspect-ratio:679/445">
       <div class="text">
         <p class="tight">I'm Aiya, a senior in Communication Design at Parsons School of Design, based in Brooklyn. Common Ground is part of my thesis, where I explore how people can connect through technology and what happens when personal, offline expression meets online data. I grew up practicing fine art, and I now work where design, code and people meet. I researched and designed this project in Figma and built it with HTML, CSS and JavaScript, using a 3D graph library and Claude Code (an AI coding tool).</p>
         <p class="tight">More of my work: <a href="https://aiyazhumagaliyeva.com" target="_blank" rel="noopener">aiyazhumagaliyeva.com</a></p>
