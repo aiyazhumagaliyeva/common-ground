@@ -248,14 +248,7 @@
       <button id="open" aria-pressed="true">Open to responses</button>
       <button id="share" aria-pressed="false">Just sharing</button>
     </div>
-    <div id="paper" class="review" role="radiogroup" aria-label="Paper colour">
-      <button class="chip" data-color="" aria-label="Original colour" aria-checked="true" role="radio"></button>
-      <button class="chip" data-color="yellow" aria-label="Yellow" role="radio" style="--c:#fde879"></button>
-      <button class="chip" data-color="pink" aria-label="Pink" role="radio" style="--c:#ffb6d2"></button>
-      <button class="chip" data-color="blue" aria-label="Blue" role="radio" style="--c:#a9dcf7"></button>
-      <button class="chip" data-color="green" aria-label="Green" role="radio" style="--c:#c4ee9f"></button>
-      <button class="chip" data-color="orange" aria-label="Orange" role="radio" style="--c:#ffc58c"></button>
-    </div>
+    <!-- paper colour chips removed: the map colours notes by their group -->
     <button id="send" class="review">Submit</button>
     <button id="retake" class="review">Retake photo</button>
   </div>
@@ -508,7 +501,8 @@
       const big = crop(src, sx, sy, sw, sh, 1200);
       smallBase = crop(src, sx, sy, sw, sh, 320, true);
       stillBase = crop(src, sx, sy, sw, sh, 900);
-      document.querySelector('#paper .chip[data-color=""]').style.backgroundImage = `url(${smallBase.toDataURL("image/jpeg", 0.6)})`;
+      const chip0 = document.querySelector('#paper .chip[data-color=""]');
+      if (chip0) chip0.style.backgroundImage = `url(${smallBase.toDataURL("image/jpeg", 0.6)})`;
       // freeze: show the photo (in the chosen paper colour) inside the window, camera off
       applyPaper();
       document.body.classList.add("reviewing");

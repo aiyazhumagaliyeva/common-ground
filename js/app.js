@@ -59,8 +59,17 @@ function paintNote(n) {
     g.restore();
   }
   if (n.__img && n.__img.naturalWidth) {
-    g.drawImage(n.__img, x, y, S, S);                    // the photo
-    brighten(g, x, y, S);                                // dark photos (bad light) get lifted, colours stay
+    const want = paperFor(n);
+    if (want) {                                          // the paper takes its group's sticky-note colour
+      const photo = recolor(n.__img, want);
+      g.drawImage(photo, x, y, S, S);
+      try { n.__colored = photo.toDataURL("image/jpeg", 0.9); } catch (e) { n.__colored = null; }
+    } else {
+      g.drawImage(n.__img, x, y, S, S);                  // the photo
+      brighten(g, x, y, S);                              // dark photos (bad light) get lifted, colours stay
+      n.__colored = null;
+    }
+    n.__paper = want ? want.join() : "";
   } else {                                               // no photo: plain paper with the words
     g.fillStyle = "#f3e6a8"; g.fillRect(x, y, S, S);
     g.fillStyle = "#222"; g.font = "32px Helvetica, Arial, sans-serif";
@@ -74,6 +83,42 @@ function paintNote(n) {
   if (m.map) m.map.dispose();
   m.map = tex; m.opacity = 1; m.needsUpdate = true;
 }
+// ---- paper colour by group ----
+// Each group gets one real sticky-note colour; notes that aren't in a group are classic yellow.
+// Groups are numbered biggest first, so the biggest group always gets the first colour.
+function paperFor(n) {
+  if (!CONFIG.GROUP_COLORS) return null;
+  const list = CONFIG.GROUP_PAPERS || [];
+  if (n.group == null || n.group < 0 || !list.length) return hexRGB(CONFIG.UNGROUPED_PAPER || "#fde879");
+  return hexRGB(list[n.group % list.length]);
+}
+const hexRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+// like a real coloured sticky note: 1. find the paper's own colour (the brightest 10% of the photo),
+// 2. make that paper white, 3. multiply by the new colour. The handwriting stays dark.
+function recolor(img, want) {
+  const c = document.createElement("canvas");
+  const k = Math.min(1, 640 / Math.max(img.naturalWidth, img.naturalHeight));
+  c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+  const g = c.getContext("2d"); g.drawImage(img, 0, 0, c.width, c.height);
+  try {
+    const im = g.getImageData(0, 0, c.width, c.height), d = im.data, lum = [];
+    for (let i = 0; i < d.length; i += 16) lum.push(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+    lum.sort((a, b) => a - b);
+    const cut = lum[Math.floor(lum.length * 0.9)] || 200;
+    let r = 0, gg = 0, b = 0, m = 0;
+    for (let i = 0; i < d.length; i += 16) if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] >= cut) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; m++; }
+    r = Math.max(40, r / m); gg = Math.max(40, gg / m); b = Math.max(40, b / m);
+    for (let i = 0; i < d.length; i += 4) {
+      d[i] = Math.min(1, d[i] / r) * want[0];
+      d[i + 1] = Math.min(1, d[i + 1] / gg) * want[1];
+      d[i + 2] = Math.min(1, d[i + 2] / b) * want[2];
+    }
+    g.putImageData(im, 0, 0);
+  } catch (e) {}                                           // a photo from another site can't be read: leave it
+  return c;
+}
+const noteSrc = n => n.__colored || n.image || "";        // the note as it looks on the map (in its group colour)
+
 // If a photo was taken in poor light, lift its brightness so the paper looks like paper again.
 // Same factor for red, green and blue, so a yellow note stays yellow (only brighter). Max ×1.8.
 function brighten(g, x, y, S) {
@@ -362,6 +407,11 @@ function regroup() {
     n.tx = r * s * Math.cos(th); n.ty = r * u * 0.8; n.tz = r * s * Math.sin(th);
   });
   notes.forEach(addResponseBadges);                       // responses loaded from the server show on the map
+  notes.forEach(n => {                                    // a note that changed group gets its new paper colour
+    if (!n.__painted || !n.__img || !n.__img.naturalWidth) return;
+    const want = paperFor(n);
+    if ((want ? want.join() : "") !== n.__paper) paintNote(n);
+  });
   animateToTargets();
 }
 
@@ -1008,7 +1058,7 @@ function showNoteView(n) {
   stopViewAnimations();
   viewNote = n;
   const v = $("noteView"), img = $("nvImg");
-  img.src = n.image || "";
+  img.src = noteSrc(n);
   img.alt = n.text;
   $("nvLabel").hidden = $("nvRespond").hidden = !n.allowReplies;
   $("nvCard").hidden = true;
@@ -1067,7 +1117,7 @@ function findResponse(id) { for (const k in responsesFor) { const r = responsesF
 function rootNoteId(id) { let r, guard = 0; while ((r = findResponse(id)) && guard++ < 10) id = r.replyTo; return id; }
 // "note" or "thread-layer" (e.g. "0-1" = first thread, the response to the response)
 function itemOf(n, key) { if (key === "note") return n; const [i, j] = key.split("-").map(Number); return (threadsOf(n)[i] || [])[j] || null; }
-function itemImage(n, key) { const o = itemOf(n, key); return o ? o.image : ""; }
+function itemImage(n, key) { if (key === "note") return noteSrc(n); const o = itemOf(n, key); return o ? o.image : ""; }
 
 // each thread is one box placed in its spot; its layers stack inside it (later answers a little lower, turned)
 function drawResponses(n, landing = null) {
@@ -1186,7 +1236,7 @@ function resetFocus() {
   if (bigItem === "note" || !viewNote) return;
   const el = $("nvResponses").querySelector(".nvResp.isNote");
   if (el) { el.src = itemImage(viewNote, bigItem) || ""; el.dataset.item = bigItem; el.classList.remove("isNote"); }
-  $("nvImg").src = viewNote.image || "";
+  $("nvImg").src = noteSrc(viewNote);
   bigItem = "note";
   showItemControls(viewNote);
 }

@@ -56,6 +56,11 @@ export const CONFIG = {
   NOTE_TILT: 5,           // random tilt of each note, in degrees (0 = straight)
   BRIGHTEN_NOTES: true,   // lift photos taken in poor light (false = show photos exactly as taken)
   BRIGHTEN_TO: 235,       // how bright the paper becomes (0–255; 255 = white)
+  // paper colour comes from the note's group (people no longer pick a colour)
+  GROUP_COLORS: true,     // false = show every photo in its own colour, as taken
+  UNGROUPED_PAPER: "#fde879",   // notes not in a group: classic canary yellow
+  // one real sticky-note colour per group, biggest group first (repeats if there are more groups)
+  GROUP_PAPERS: ["#ffb6d2", "#a9dcf7", "#c4ee9f", "#ffc58c", "#d7c6f5", "#9fe5dc", "#ff9fa0", "#e6f39a", "#b8c9fa", "#f6b0ea"],
   NOTE_SHADOW: true,      // soft shadow under each note
   NOTE_GAP: 0,            // space between notes (0 = off, 1 = edges touch). Bigger = more spread out
   BG_COLOR: "#ffffff",    // map background (also change body background-color in index.html to match)
