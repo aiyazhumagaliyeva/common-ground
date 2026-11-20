@@ -188,7 +188,7 @@
       text-align: center; text-wrap: pretty; line-height: normal; margin-top: calc(20 * var(--k));
       font-size: max(14px, calc(20 * var(--k))); max-width: 100%;
     }
-    .steps > .step:first-child p { max-width: calc(265 * var(--k)); }   /* Figma: step 1's text is narrower */
+    @media (min-width: 601px) { .steps > .step:first-child p { max-width: calc(265 * var(--k)); } }   /* laptop Figma: step 1's text is narrower */
     .qrCard { display: flex; flex-direction: column; align-items: center; gap: calc(17 * var(--k)); align-self: center; }
     /* Figma (add yours-new, Frame 27): just the QR, 218 × 218, no card */
     .qrCard .box { display: flex; flex-direction: column; min-width: calc(218 * var(--k)); min-height: calc(218 * var(--k)); }
@@ -269,10 +269,14 @@
       .about h2 { font-size: 18px; }
       /* add a note: one column of steps, "Submit a note" button at the bottom */
       .steps { width: 325px; max-width: calc(100vw - 48px); margin: 40px auto 0; grid-template-columns: 1fr; row-gap: 40px; padding-bottom: 140px; }
-      .step .num { width: 34px; font-size: 20px; }
-      .step img { height: 150px; }
-      .step img.mob { height: 96px; display: block; }
-      .step .pic { height: 150px; }
+      /* Figma phone "How to contribute": the number sits beside the drawing (same row), drawings at full size */
+      .step .num { width: 34px; font-size: 20px; margin-bottom: -34px; position: relative; z-index: 1; }
+      .step .pic { height: auto; }
+      .step .pic img { max-height: none; }
+      .steps > .step:nth-child(1) .pic img { height: 131px !important; }
+      .steps > .step:nth-child(2) .pic img { height: 160px !important; }
+      .steps > .step:nth-child(3) .pic img.mob { height: 96px !important; display: block; }
+      .steps > .step:nth-child(4) .pic img, .steps > .step:nth-child(5) .pic img { height: 184px !important; }
       .step p { font-size: 16px; margin-top: 20px; max-width: none; }
       .qrCard .caption, #addStatus:empty { display: none; }
       .cameraBtn, .cameraBtn[hidden] { position: fixed; left: 50%; right: auto; transform: translateX(-50%); bottom: calc(57px + env(safe-area-inset-bottom, 0px));
