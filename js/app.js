@@ -194,7 +194,9 @@ graph.d3Force("charge", null);           // no physics: positions come from mean
 graph.d3Force("link", null);
 graph.d3Force("center", null);
 graph.graphData({ nodes: notes, links: [] });
-graph.cameraPosition({ x: 0, y: 0, z: CONFIG.MAX_ZOOM * 1.8 });    // intro starts far away
+// intro starts a bit farther out than where it settles. x is not exactly 0 on purpose: the graph library
+// pushes the camera far away by itself while the camera sits at exactly (0, 0, z), and that made a tiny-clump view
+graph.cameraPosition({ x: 0.01, y: 0, z: (CONFIG.LAPTOP_START_ZOOM || CONFIG.START_ZOOM) * 1.7 });
 
 // zoom goes toward where the mouse points, so far-away notes are easy to reach
 const controls = graph.controls();
@@ -343,9 +345,14 @@ function animateToTargets(ms = 1600) {
 function regroup() {
   const known = notes.filter(n => n.vec);
   const count = layout(known);
-  notes.forEach(n => {                                   // not read yet: wait near the middle
+  // not read yet (the AI model is still loading): wait in its own spot spread through the cloud,
+  // never in a pile in the middle; it moves to its real spot once it's read
+  const R = CONFIG.MAP_RADIUS;
+  notes.forEach(n => {
     if (n.vec || n.tx !== undefined) return;
-    n.tx = rnd() * 0.6; n.ty = rnd() * 0.6; n.tz = rnd() * 0.6;
+    const u = hashUnit(n.id, 11), th = Math.PI * hashUnit(n.id, 12), r = R * (0.45 + 0.45 * Math.abs(hashUnit(n.id, 13)));
+    const s = Math.sqrt(1 - u * u);
+    n.tx = r * s * Math.cos(th); n.ty = r * u * 0.8; n.tz = r * s * Math.sin(th);
   });
   notes.forEach(addResponseBadges);                       // responses loaded from the server show on the map
   animateToTargets();
@@ -472,23 +479,16 @@ function justSentId() {
 }
 const JUST_SENT = justSentId();                             // read once, before the address is cleaned up
 
-// ---- start: load saved notes, read meaning, arrange ----
+// ---- start: show the map right away, add the saved notes when they arrive, read meaning, arrange ----
+// The saved notes come from Google (often 3–6 s). The map never waits for them: it opens with the built-in notes,
+// and the saved ones pop in when they arrive.
+let savedReady = Promise.resolve();
 async function start() {
-  if (serverOn) {
-    try {
-      const res = await fetch(CONFIG.SERVER_URL + "?action=approved");
-      const saved = await res.json();
-      const justSent = JUST_SENT;                            // this phone's own new note/response: it flies in after the intro
-      saved.filter(s => (!CONFIG.PHOTO_NOTES_ONLY || s.image) && !(justSent && String(s.id) === justSent)).forEach(s => {
-        if (s.replyTo) { (responsesFor[s.replyTo] = responsesFor[s.replyTo] || []).push({ id: "s" + s.id, replyTo: s.replyTo, text: s.text, image: s.image }); return; }
-        notes.push({
-          id: "s" + s.id, text: s.text, image: s.image || null, color: s.color,
-          allowReplies: s.allowReplies, group: -1, fx: rnd(), fy: rnd(), fz: rnd()
-        });
-      });
-      graph.graphData({ nodes: notes, links: [] });
-    } catch (e) { console.warn("Could not load saved notes", e); }
-  }
+  const loading = serverOn
+    ? fetch(CONFIG.SERVER_URL + "?action=approved").then(r => r.json()).catch(e => { console.warn("Could not load saved notes", e); return null; })
+    : Promise.resolve(null);
+  savedReady = loading.then(() => {});
+
   // 1. show the map right away with the notes we already understand
   notes.forEach(n => (n.vec = knownVector(n.text)));
   regroup();
@@ -496,7 +496,28 @@ async function start() {
   showMyNote();
   track("map_ready", { notes: notes.length, ms: Math.round(performance.now()) });
 
-  // 2. notes we haven't read before: the AI model loads quietly in the background
+  // 2. the saved notes (and responses) join when they arrive
+  const saved = await loading;
+  if (saved) {
+    const justSent = JUST_SENT;                            // this phone's own new note/response: it flies in by itself
+    const added = [];
+    saved.filter(s => (!CONFIG.PHOTO_NOTES_ONLY || s.image) && !(justSent && String(s.id) === justSent)).forEach(s => {
+      if (s.replyTo) { (responsesFor[s.replyTo] = responsesFor[s.replyTo] || []).push({ id: "s" + s.id, replyTo: s.replyTo, text: s.text, image: s.image }); return; }
+      if (notes.some(n => n.id === "s" + s.id)) return;
+      const n = { id: "s" + s.id, text: s.text, image: s.image || null, color: s.color, allowReplies: s.allowReplies, group: -1, fx: 0, fy: 0, fz: 0 };
+      n.vec = knownVector(n.text);
+      notes.push(n); added.push(n);
+    });
+    graph.graphData({ nodes: notes, links: [] });
+    regroup();
+    setTimeout(() => added.forEach((n, i) => {             // pop in gently
+      if (!n.__group) return;
+      n.__group.scale.setScalar(0.001);
+      setTimeout(() => tween(700, e => n.__group.scale.setScalar(Math.max(0.001, e)), easeOutBack), i * 40);
+    }), 30);
+  }
+
+  // 3. notes we haven't read before: the AI model loads quietly in the background
   const unknown = notes.filter(n => !n.vec);
   if (!unknown.length) return;
   try {
@@ -505,10 +526,10 @@ async function start() {
     regroup();
   } catch (e) {
     console.error(e);
-    console.warn("Could not load the AI model. New notes stay in the middle.");
+    console.warn("Could not load the AI model. New notes wait in their own spot until it loads.");
   }
 }
-start();
+setTimeout(start, 0);   // after this whole file has loaded (start uses helpers defined further down)
 
 // ============================================================
 //  NAVIGATION + "ADD YOURS" (phone handoff with a QR code)
@@ -636,7 +657,7 @@ async function showMyNote() {
   let data = null;
   try { data = JSON.parse(localStorage.getItem(key)); } catch (e) {}
   if (!data || Date.now() - (data.t || 0) > 10 * 60 * 1000) return;   // only right after sending
-  await wait(2800);                            // let the intro finish first
+  await Promise.all([wait(2800), savedReady]);  // let the intro finish, and the saved notes arrive, first
   if (q.has("mine")) { arrive(data); return; }
   const n = notes.find(x => x.id === rootNoteId(data.replyTo));
   if (!n) return;
