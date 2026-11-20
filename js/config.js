@@ -62,6 +62,26 @@ export const CONFIG = {
   // one real sticky-note colour per group, biggest group first (repeats if there are more groups)
   GROUP_PAPERS: ["#ffb6d2", "#a9dcf7", "#c4ee9f", "#ffc58c", "#d7c6f5", "#9fe5dc", "#ff9fa0", "#e6f39a", "#b8c9fa", "#f6b0ea", "#e8cfa9", "#c4f0fb"],
   SHOW_LEGEND: true,      // the colour index in the bottom right (false = hide it)
+  // names for the groups in the index. Each group gets the theme whose words appear in most of its notes
+  // (the AI only makes groups, it doesn't name them). A group that matches nothing is called "Mixed".
+  // Add or change themes and words freely: [name, [words...]]
+  GROUP_THEMES: [
+    ["Becoming better",      ["better", "belong", "laugh", "improve", "person"]],
+    ["Confidence",           ["confident", "confidence", "awkward", "shy", "speaker"]],
+    ["Family & friends",     ["mom", "mother", "dad", "family", "friend", "friends", "friendship", "sibling", "siblings", "brother", "sister", "bro", "hug"]],
+    ["Motivation",           ["procrastinate", "motivated", "motivation", "lazy", "push", "passionate", "say no", "start working", "making things"]],
+    ["Money",                ["rich", "money", "billionaire", "earn", "economy", "debt", "debtless", "financial", "$", "nepo"]],
+    ["Worry & the future",   ["worry", "worrying", "future", "okay", "reassured", "sure", "holds"]],
+    ["Work & career",        ["job", "jobs", "work", "career", "designer", "h1b", "apple", "paid"]],
+    ["Happiness",            ["happy", "happily", "happiness", "joy", "live", "life as"]],
+    ["Sleep & rest",         ["sleep", "rest", "tired", "hours of"]],
+    ["Knowing & meaning",    ["know", "knowing", "answer", "understand", "everything", "what i'm doing"]],
+    ["Other people",         ["opinions", "people's", "mind", "others", "myself"]],
+    ["Travel & freedom",     ["travel", "world", "alaska", "fly", "free", "astronaut"]],
+    ["Time",                 ["time", "slow down", "forever", "back in time"]],
+    ["Health & body",        ["health", "skin", "nicotine", "surgery", "eat"]],
+    ["Love",                 ["boyfriend", "girlfriend", "date", "love", "relationship", "laid"]],
+  ],
   NOTE_SHADOW: true,      // soft shadow under each note
   NOTE_GAP: 0,            // space between notes (0 = off, 1 = edges touch). Bigger = more spread out
   BG_COLOR: "#ffffff",    // map background (also change body background-color in index.html to match)

@@ -23,6 +23,7 @@ const serverOn = CONFIG.SERVER_URL.trim() !== "";
 //  NOTES
 // ============================================================
 const notes = [];
+if (/[?&]debug\b/.test(location.search)) window.__notes = notes;   // for testing only (?debug)
 const responsesFor = {};        // note id → [{ text, image, pending }]
 // preview only: white placeholder responses so the layout can be judged before real ones exist
 Object.entries(CONFIG.RESPONSE_PREVIEW || {}).forEach(([id, count]) => {
@@ -81,7 +82,7 @@ function paintNote(n) {
   tex.colorSpace = THREE.SRGBColorSpace;
   const m = n.__note.material;
   if (m.map) m.map.dispose();
-  m.map = tex; m.opacity = 1; m.needsUpdate = true;
+  m.map = tex; m.opacity = highlighted === null || (highlighted === -1 ? !(n.group >= 0) : n.group === highlighted) ? 1 : 0.12; m.needsUpdate = true;
 }
 // ---- paper colour by group ----
 // Each group gets one real sticky-note colour; notes that aren't in a group are classic yellow.
@@ -416,6 +417,42 @@ function regroup() {
   animateToTargets();
 }
 
+// highlight one group's notes: the others fade back (null = show all)
+let highlighted = null;
+function highlightGroup(g) {
+  highlighted = g;
+  notes.forEach(n => {
+    const m = n.__note && n.__note.material;
+    if (!m || !n.__painted) return;
+    const inGroup = g === null || (g === -1 ? !(n.group >= 0) : n.group === g);
+    m.opacity = inGroup ? 1 : 0.12;
+  });
+  document.querySelectorAll("#legend .row").forEach(r => r.classList.toggle("on", g !== null && Number(r.dataset.g) === g));
+  $("legend").classList.toggle("focusing", g !== null);
+}
+
+// a name for each group: the theme (CONFIG.GROUP_THEMES) whose words appear in the most of its notes.
+// Each theme names one group only (the best match wins); groups with no clear match are "Mixed".
+function groupNames(groups) {
+  const themes = CONFIG.GROUP_THEMES || [], names = {}, cand = [];
+  const has = (text, w) => {
+    const t = " " + String(text).toLowerCase().replace(/^\s*i\s*wish\s*i\s*could\s*/, "").replace(/[^a-z0-9$'\s]/g, " ") + " ";
+    return /^[a-z0-9']+$/.test(w) ? new RegExp("[^a-z0-9']" + w.replace(/'/g, "'") + "[^a-z0-9']").test(t) : t.includes(w);
+  };
+  groups.forEach(g => {
+    const texts = notes.filter(n => n.vec && n.group === g).map(n => n.text);
+    themes.forEach(([name, words], ti) => {
+      const hits = texts.filter(t => words.some(w => has(t, w))).length;
+      if (hits >= 2 || (hits && hits / texts.length >= 0.5)) cand.push({ g, ti, name, score: hits / texts.length + hits * 0.01 });
+    });
+  });
+  cand.sort((a, b) => b.score - a.score);
+  const usedT = new Set();
+  cand.forEach(c => { if (names[c.g] || usedT.has(c.ti)) return; names[c.g] = c.name; usedT.add(c.ti); });
+  groups.forEach(g => { if (!names[g]) names[g] = "Mixed"; });
+  return names;
+}
+
 // ---- colour index, bottom right: each group's colour and how many notes are in it ----
 function drawLegend() {
   const el = $("legend");
@@ -424,11 +461,18 @@ function drawLegend() {
   notes.forEach(n => { if (n.vec) { const g = n.group >= 0 ? n.group : -1; counts[g] = (counts[g] || 0) + 1; } });
   const groups = Object.keys(counts).map(Number).filter(g => g >= 0).sort((a, b) => a - b);
   const sw = n => `<span class="sw" style="background:${paperFor(n) ? "rgb(" + paperFor(n).join() + ")" : "#fde879"}"></span>`;
+  const names = groupNames(groups);
   const strip = groups.concat(counts[-1] ? [-1] : []).map(g => sw({ group: g })).join("");
   el.innerHTML = `<button type="button" class="lgHead" aria-expanded="${el.classList.contains("open")}"><b>Groups by meaning</b><span class="strip">${strip}</span></button>` +
-    groups.map((g, i) => `<div class="row">${sw({ group: g })}<span>Group ${i + 1}</span><span class="n">${counts[g]}</span></div>`).join("") +
-    (counts[-1] ? `<div class="row">${sw({ group: -1 })}<span>Not in a group</span><span class="n">${counts[-1]}</span></div>` : "");
+    groups.map(g => `<div class="row" data-g="${g}">${sw({ group: g })}<span>${names[g]}</span><span class="n">${counts[g]}</span></div>`).join("") +
+    (counts[-1] ? `<div class="row" data-g="-1">${sw({ group: -1 })}<span>Not in a group</span><span class="n">${counts[-1]}</span></div>` : "");
   el.hidden = !groups.length && !counts[-1];
+  el.querySelectorAll(".row").forEach(row => {           // hover (or tap on a phone) a group: its notes stand out
+    const g = Number(row.dataset.g);
+    row.onmouseenter = () => highlightGroup(g);
+    row.onmouseleave = () => highlightGroup(null);
+    row.onclick = () => highlightGroup(highlighted === g ? null : g);
+  });
   el.querySelector(".lgHead").onclick = () => {          // phones: tap to open / close
     el.classList.toggle("open");
     el.querySelector(".lgHead").setAttribute("aria-expanded", el.classList.contains("open"));

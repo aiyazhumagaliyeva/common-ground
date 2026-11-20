@@ -145,16 +145,19 @@
     body.page-open #nav { bottom: -80px; }                  /* slides away on pages */
     /* ---------- COLOUR INDEX (bottom right): one row per group = its colour + how many notes ---------- */
     #legend { position: fixed; z-index: 3; right: max(16px, calc(36 * var(--k))); bottom: max(16px, calc(36 * var(--k)));
-      font-family: Helvetica, Arial, sans-serif; font-size: max(11px, calc(13 * var(--k))); color: #000;
-      background: rgba(255,255,255,0.85); border: 1px solid #000; border-radius: 14px; padding: 10px 12px;
-      display: flex; flex-direction: column; gap: 5px; transition: opacity 0.3s, transform 0.3s; }
+      font-family: Helvetica, Arial, sans-serif; font-size: 11px; line-height: 1.2; color: #000;
+      background: rgba(255,255,255,0.85); border: 1px solid #000; border-radius: 10px; padding: 7px 9px;
+      display: flex; flex-direction: column; gap: 2px; transition: opacity 0.3s, transform 0.3s; }
     #legend[hidden] { display: none; }
     #legend .lgHead { all: unset; display: flex; align-items: center; gap: 8px; cursor: default; }
-    #legend b { font-weight: 400; color: rgba(0,0,0,0.55); margin-bottom: 2px; }
+    #legend b { font-weight: 400; color: rgba(0,0,0,0.55); margin-bottom: 1px; }
     #legend .strip { display: none; gap: 3px; }
-    #legend .row { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-    #legend .sw { width: 14px; height: 14px; flex: none; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
-    #legend .n { margin-left: auto; padding-left: 10px; font-variant-numeric: tabular-nums; }
+    #legend .row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    #legend .sw { width: 9px; height: 9px; flex: none; box-shadow: 0 1px 2px rgba(0,0,0,0.25); }
+    #legend .row { cursor: pointer; border-radius: 4px; padding: 1px 3px; margin: 0 -3px; transition: opacity 0.2s, background 0.2s; }
+    #legend.focusing .row:not(.on) { opacity: 0.4; }
+    #legend .row.on { background: rgba(0,0,0,0.06); }
+    #legend .n { margin-left: auto; padding-left: 8px; font-variant-numeric: tabular-nums; color: rgba(0,0,0,0.55); }
     body.page-open #legend { opacity: 0; transform: translateY(20px); pointer-events: none; }
     #nav .divider { width: 2px; height: max(14px, calc(19 * var(--k))); display: block; }
     #nav button { all: unset; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 7px; }
