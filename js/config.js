@@ -45,8 +45,9 @@ export const CONFIG = {
   MAX_PIXEL_RATIO: 1.5,   // sharpness on Retina screens: 2 = sharpest but laggy, 1 = smoothest but softer
   ZOOM_TO_MOUSE: false,   // true = zoom toward the mouse (map can drift off-center); false = zoom toward the middle
   ZOOM_SPEED: 1.4,        // how fast pinching zooms (1 = normal)
-  PHONE_LOCK_CENTER: true, // phones: the map stays in the center; fingers only turn and zoom it (false = two fingers can move it)
-  DRAG_SPEED: 0.1,        // click and drag: 0.1 = the map follows your hand about 1:1 (was 0.9 = about 5×)
+  LOCK_CENTER: true,      // the map stays in the center: dragging turns it, never moves it (false = drag moves the map)
+  DRAG_TURN: 1.6,         // laptop: how strongly click-and-drag turns the map (phones: 2.4)
+  DRAG_SPEED: 0.1,        // only if LOCK_CENTER is false: how far click-and-drag moves the map
   DRAG_STOP: 0.3,         // how quickly it stops gliding after you let go (0.1 = long glide, 0.5 = stops right away)
   SCROLL_TURN: 1,         // how strongly scrolling turns the map (1 = same as comfortmagazine.world, 0.5 = half)
   // ---- how a note looks as paper ----

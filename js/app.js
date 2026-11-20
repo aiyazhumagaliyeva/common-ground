@@ -200,15 +200,17 @@ graph.cameraPosition({ x: 0.01, y: 0, z: (CONFIG.LAPTOP_START_ZOOM || CONFIG.STA
 
 // zoom goes toward where the mouse points, so far-away notes are easy to reach
 const controls = graph.controls();
-controls.rotateSpeed = 2.4;           // finger / right-drag turning
-controls.panSpeed = CONFIG.DRAG_SPEED ?? 0.1;            // click and drag: how far the map moves
-// phones: the map is locked to its center. One finger turns it around the center, pinch zooms; it never slides away.
+// the map is locked to its center (phones and laptops): dragging TURNS it around the center, it never slides away.
+// Pinch / two-finger scroll still zoom and turn it.
 const TOUCH_FIRST = matchMedia("(pointer: coarse)").matches;
-if (TOUCH_FIRST && CONFIG.PHONE_LOCK_CENTER !== false) controls.noPan = true;
+const LOCK_CENTER = (CONFIG.LOCK_CENTER ?? CONFIG.PHONE_LOCK_CENTER) !== false;
+controls.rotateSpeed = TOUCH_FIRST ? 2.4 : (CONFIG.DRAG_TURN ?? 1.6);   // finger on a phone / click and drag on a laptop
+controls.panSpeed = CONFIG.DRAG_SPEED ?? 0.1;            // only used if LOCK_CENTER is false
+if (LOCK_CENTER) controls.noPan = true;
 controls.dynamicDampingFactor = CONFIG.DRAG_STOP ?? 0.3;  // how fast it stops after you let go (higher = sooner)
 // laptop: click and drag MOVES the map (shifts the center); two fingers on the trackpad turn it (see below);
 // right-click and drag also turns it. Phones keep one finger = turn, two fingers = pinch zoom / move.
-controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+controls.mouseButtons = { LEFT: LOCK_CENTER ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
 // don't let the center wander off into empty space: keep it inside the cloud
 controls.addEventListener("change", () => {
   if (selected || performance.now() < camTweenUntil) return;          // only when YOU move it (not while flying to a note)
@@ -393,7 +395,7 @@ function flyTo(node, ms = 1500) {
 let pivotDepth = 0;
 function restorePivot() {
   if (!pivotDepth) return;
-  if (TOUCH_FIRST && CONFIG.PHONE_LOCK_CENTER !== false) {   // phones: glide back to turning around the map's center
+  if (LOCK_CENTER) {                                         // glide back to turning around the map's center
     pivotDepth = 0;
     const p = graph.camera().position;
     graph.cameraPosition({ x: p.x, y: p.y, z: p.z }, { x: 0, y: 0, z: 0 }, 700);
@@ -756,7 +758,7 @@ const touch = matchMedia("(pointer: coarse)").matches;
 // every step's text sits in the same spot, bottom right: its bottom edge lines up with the bottom of the menu pill
 const TOUR_TEXT_AT = [1010, 912];
 const TOUR = [
-  { id: "rotate", phone: "Drag with one finger to rotate the map", text: "Slide two fingers on the trackpad to rotate the map. Click and drag to move around.",
+  { id: "rotate", phone: "Drag with one finger to rotate the map", text: "Click and drag, or slide two fingers on the trackpad, to rotate the map",
     from: [671, 532], to: [990, 579], textAt: TOUR_TEXT_AT },
   { id: "zoom", phone: "Pinch with two fingers to zoom in or zoom out", text: "Pinch with two fingers on the trackpad to zoom in or zoom out",
     image: "illustrations/zoom.png", textAt: TOUR_TEXT_AT, imageAt: [955, 713, 409, 221] },   // the drawing sits above the text
@@ -860,12 +862,12 @@ function nextTourStep() {
   controls.autoRotateSpeed = CONFIG.DRIFT_SPEED;
   if (hand && st.id === "zoom") { cur.hidden = false; cur.src = "icons/hand-spread.png"; at(cur, 700, 470); }
   if (st.id === "rotate") {                                  // the map turns; phones also show the dragging hand
-    cur.hidden = !hand;                                      // laptop: two fingers on the trackpad don't move the cursor
+    cur.hidden = false;                                      // the cursor (laptop) or hand (phone) drags across
     cur.src = hand ? "icons/hand-point.png" : "icons/cursor.svg";
     at(cur, st.from[0], st.from[1]);
     cur.style.setProperty("--dx", `calc(${st.to[0] - st.from[0]} * var(--k))`);
     cur.style.setProperty("--dy", `calc(${st.to[1] - st.from[1]} * var(--k))`);
-    cur.className = hand ? "hand drag" : "";
+    cur.className = hand ? "hand drag" : "drag";
     controls.autoRotate = true;
     controls.autoRotateSpeed = 3;
   }
