@@ -60,7 +60,8 @@ export const CONFIG = {
   GROUP_COLORS: true,     // false = show every photo in its own colour, as taken
   UNGROUPED_PAPER: "#fde879",   // notes not in a group: classic canary yellow
   // one real sticky-note colour per group, biggest group first (repeats if there are more groups)
-  GROUP_PAPERS: ["#ffb6d2", "#a9dcf7", "#c4ee9f", "#ffc58c", "#d7c6f5", "#9fe5dc", "#ff9fa0", "#e6f39a", "#b8c9fa", "#f6b0ea"],
+  GROUP_PAPERS: ["#ffb6d2", "#a9dcf7", "#c4ee9f", "#ffc58c", "#d7c6f5", "#9fe5dc", "#ff9fa0", "#e6f39a", "#b8c9fa", "#f6b0ea", "#e8cfa9", "#c4f0fb"],
+  SHOW_LEGEND: true,      // the colour index in the bottom right (false = hide it)
   NOTE_SHADOW: true,      // soft shadow under each note
   NOTE_GAP: 0,            // space between notes (0 = off, 1 = edges touch). Bigger = more spread out
   BG_COLOR: "#ffffff",    // map background (also change body background-color in index.html to match)

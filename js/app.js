@@ -412,7 +412,27 @@ function regroup() {
     const want = paperFor(n);
     if ((want ? want.join() : "") !== n.__paper) paintNote(n);
   });
+  drawLegend();
   animateToTargets();
+}
+
+// ---- colour index, bottom right: each group's colour and how many notes are in it ----
+function drawLegend() {
+  const el = $("legend");
+  if (!el || !CONFIG.GROUP_COLORS || CONFIG.SHOW_LEGEND === false) { if (el) el.hidden = true; return; }
+  const counts = {};
+  notes.forEach(n => { if (n.vec) { const g = n.group >= 0 ? n.group : -1; counts[g] = (counts[g] || 0) + 1; } });
+  const groups = Object.keys(counts).map(Number).filter(g => g >= 0).sort((a, b) => a - b);
+  const sw = n => `<span class="sw" style="background:${paperFor(n) ? "rgb(" + paperFor(n).join() + ")" : "#fde879"}"></span>`;
+  const strip = groups.concat(counts[-1] ? [-1] : []).map(g => sw({ group: g })).join("");
+  el.innerHTML = `<button type="button" class="lgHead" aria-expanded="${el.classList.contains("open")}"><b>Groups by meaning</b><span class="strip">${strip}</span></button>` +
+    groups.map((g, i) => `<div class="row">${sw({ group: g })}<span>Group ${i + 1}</span><span class="n">${counts[g]}</span></div>`).join("") +
+    (counts[-1] ? `<div class="row">${sw({ group: -1 })}<span>Not in a group</span><span class="n">${counts[-1]}</span></div>` : "");
+  el.hidden = !groups.length && !counts[-1];
+  el.querySelector(".lgHead").onclick = () => {          // phones: tap to open / close
+    el.classList.toggle("open");
+    el.querySelector(".lgHead").setAttribute("aria-expanded", el.classList.contains("open"));
+  };
 }
 
 // start zoom depends on how many notes there are:
