@@ -277,7 +277,7 @@
       .steps > .step:nth-child(2) .pic img { height: 160px !important; }
       .steps > .step:nth-child(3) .pic img.mob { height: 96px !important; display: block; }
       .steps > .step:nth-child(4) .pic img, .steps > .step:nth-child(5) .pic img { height: 184px !important; }
-      .step p { font-size: 16px; margin-top: 20px; max-width: none; }
+      .step p { font-size: 16px; margin-top: 20px; max-width: none; width: 100%; text-wrap: wrap; }   /* every step's text uses the full column width */
       .qrCard .caption, #addStatus:empty { display: none; }
       .cameraBtn, .cameraBtn[hidden] { position: fixed; left: 50%; right: auto; transform: translateX(-50%); bottom: calc(57px + env(safe-area-inset-bottom, 0px));
         z-index: 6; padding: 16px 50px; border-radius: 60px; background: #ffda69; color: #000; box-shadow: none;

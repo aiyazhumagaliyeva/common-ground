@@ -204,10 +204,10 @@ const controls = graph.controls();
 // Pinch / two-finger scroll still zoom and turn it.
 const TOUCH_FIRST = matchMedia("(pointer: coarse)").matches;
 const LOCK_CENTER = (CONFIG.LOCK_CENTER ?? CONFIG.PHONE_LOCK_CENTER) !== false;
-controls.rotateSpeed = TOUCH_FIRST ? 2.4 : (CONFIG.DRAG_TURN ?? 1.6);   // finger on a phone / click and drag on a laptop
+controls.rotateSpeed = TOUCH_FIRST ? (CONFIG.PHONE_DRAG_TURN ?? 4) : (CONFIG.DRAG_TURN ?? 1.6);   // finger on a phone / click and drag on a laptop
 controls.panSpeed = CONFIG.DRAG_SPEED ?? 0.1;            // only used if LOCK_CENTER is false
 if (LOCK_CENTER) controls.noPan = true;
-controls.dynamicDampingFactor = CONFIG.DRAG_STOP ?? 0.3;  // how fast it stops after you let go (higher = sooner)
+controls.dynamicDampingFactor = TOUCH_FIRST ? (CONFIG.PHONE_DRAG_STOP ?? 0.15) : (CONFIG.DRAG_STOP ?? 0.3);  // how fast it stops after you let go (higher = sooner)
 // laptop: click and drag MOVES the map (shifts the center); two fingers on the trackpad turn it (see below);
 // right-click and drag also turns it. Phones keep one finger = turn, two fingers = pinch zoom / move.
 controls.mouseButtons = { LEFT: LOCK_CENTER ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
