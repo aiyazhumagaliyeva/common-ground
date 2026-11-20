@@ -63,7 +63,7 @@
     #still { width: 100%; height: 100%; object-fit: cover; display: none; }
     /* camera guide (Figma phone-camera): a dashed square where the note goes, and a faint "I wish I could..." */
     #guide {
-      position: absolute; left: calc(41 * var(--k)); top: calc(62 * var(--k));
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);   /* centred in the camera window */
       width: calc(287 * var(--k)); height: calc(296 * var(--k));
       border: 2px dashed #fff; border-radius: calc(20 * var(--k)); opacity: 0.3; pointer-events: none;
     }
