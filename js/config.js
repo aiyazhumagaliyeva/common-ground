@@ -58,7 +58,7 @@ export const CONFIG = {
   BRIGHTEN_TO: 235,       // how bright the paper becomes (0–255; 255 = white)
   // paper colour comes from the note's group (people no longer pick a colour)
   GROUP_COLORS: true,     // false = show every photo in its own colour, as taken
-  UNGROUPED_PAPER: "#fde879",   // notes not in a group: classic canary yellow
+  // notes not in a group keep their own colour, as photographed
   // one real sticky-note colour per group, biggest group first (repeats if there are more groups)
   GROUP_PAPERS: ["#ffb6d2", "#a9dcf7", "#c4ee9f", "#ffc58c", "#d7c6f5", "#9fe5dc", "#ff9fa0", "#e6f39a", "#b8c9fa", "#f6b0ea", "#e8cfa9", "#c4f0fb"],
   SHOW_LEGEND: true,      // the colour index in the bottom right (false = hide it)
@@ -66,22 +66,25 @@ export const CONFIG = {
   // (the AI only makes groups, it doesn't name them). A group that matches nothing is called "Mixed".
   // Add or change themes and words freely: [name, [words...]]
   GROUP_THEMES: [
-    ["Becoming better",      ["better", "belong", "laugh", "improve", "person"]],
-    ["Confidence",           ["confident", "confidence", "awkward", "shy", "speaker"]],
-    ["Family & friends",     ["mom", "mother", "dad", "family", "friend", "friends", "friendship", "sibling", "siblings", "brother", "sister", "bro", "hug"]],
-    ["Motivation",           ["procrastinate", "motivated", "motivation", "lazy", "push", "passionate", "say no", "start working", "making things"]],
-    ["Money",                ["rich", "money", "billionaire", "earn", "economy", "debt", "debtless", "financial", "$", "nepo"]],
-    ["Worry & the future",   ["worry", "worrying", "future", "okay", "reassured", "sure", "holds"]],
-    ["Work & career",        ["job", "jobs", "work", "career", "designer", "h1b", "apple", "paid"]],
-    ["Happiness",            ["happy", "happily", "happiness", "joy", "live", "life as"]],
-    ["Sleep & rest",         ["sleep", "rest", "tired", "hours of"]],
-    ["Knowing & meaning",    ["know", "knowing", "answer", "understand", "everything", "what i'm doing"]],
-    ["Other people",         ["opinions", "people's", "mind", "others", "myself"]],
-    ["Travel & freedom",     ["travel", "world", "alaska", "fly", "free", "astronaut"]],
-    ["Time",                 ["time", "slow down", "forever", "back in time"]],
-    ["Health & body",        ["health", "skin", "nicotine", "surgery", "eat"]],
-    ["Love",                 ["boyfriend", "girlfriend", "date", "love", "relationship", "laid"]],
+    //  name                    colour      words
+    ["Becoming better",      "#d7c6f5", ["better", "belong", "laugh", "improve", "person"]],                         // lavender
+    ["Confidence",           "#ffc58c", ["confident", "confidence", "awkward", "shy", "speaker"]],                     // orange
+    ["Family & friends",     "#ffb6d2", ["mom", "mother", "dad", "family", "friend", "friends", "friendship", "sibling", "siblings", "brother", "sister", "bro", "hug"]],   // pink
+    ["Motivation",           "#ff9fa0", ["procrastinate", "motivated", "motivation", "lazy", "push", "passionate", "say no", "start working", "making things"]],          // coral
+    ["Money",                "#b9e89a", ["rich", "money", "billionaire", "earn", "economy", "debt", "debtless", "financial", "$", "nepo"]],                             // green
+    ["Worry & the future",   "#a9dcf7", ["worry", "worrying", "future", "okay", "reassured", "sure", "holds"]],       // blue
+    ["Work & career",        "#e8cfa9", ["job", "jobs", "work", "career", "designer", "h1b", "apple", "paid"]],        // kraft brown
+    ["Happiness",            "#ffd9b0", ["happy", "happily", "happiness", "joy", "live", "life as"]],                 // peach (no yellow: the paper notes are yellow already)
+    ["Sleep & rest",         "#b8c9fa", ["sleep", "rest", "tired", "hours of"]],                                     // periwinkle
+    ["Knowing & meaning",    "#9fe5dc", ["know", "knowing", "answer", "understand", "everything", "what i'm doing"]], // aqua
+    ["Other people",         "#f6b0ea", ["opinions", "people's", "mind", "others", "myself"]],                       // magenta
+    ["Travel & freedom",     "#c4f0fb", ["travel", "world", "alaska", "fly", "free", "astronaut"]],                  // sky
+    ["Time",                 "#e6f39a", ["time", "slow down", "forever", "back in time"]],                           // lime
+    ["Health & body",        "#bff0d4", ["health", "skin", "nicotine", "surgery", "eat"]],                           // mint
+    ["Love",                 "#f7a1b5", ["boyfriend", "girlfriend", "date", "love", "relationship", "laid"]],         // rose
   ],
+  MIXED_PAPER: "#dcdcdc",  // a group that matches no theme ("Mixed"): light grey
+  TINT: 0.55,             // how strong the colour is (1 = full sticky-note colour, 0 = no colour)
   NOTE_SHADOW: true,      // soft shadow under each note
   NOTE_GAP: 0,            // space between notes (0 = off, 1 = edges touch). Bigger = more spread out
   BG_COLOR: "#ffffff",    // map background (also change body background-color in index.html to match)

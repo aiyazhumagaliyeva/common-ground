@@ -88,10 +88,20 @@ function paintNote(n) {
 // Each group gets one real sticky-note colour; notes that aren't in a group are classic yellow.
 // Groups are numbered biggest first, so the biggest group always gets the first colour.
 function paperFor(n) {
-  if (!CONFIG.GROUP_COLORS) return null;
-  const list = CONFIG.GROUP_PAPERS || [];
-  if (n.group == null || n.group < 0 || !list.length) return hexRGB(CONFIG.UNGROUPED_PAPER || "#fde879");
-  return hexRGB(list[n.group % list.length]);
+  if (!CONFIG.GROUP_COLORS || n.group == null || n.group < 0) return null;   // not in a group: no colour
+  const hex = groupPaper[n.group];
+  if (!hex) return null;
+  const t = CONFIG.TINT ?? 0.55;                           // soften: mix the sticky-note colour with white
+  return hexRGB(hex).map(v => Math.round(255 - (255 - v) * t));
+}
+// each group's name and colour; the colour belongs to the theme (Money is always green), worked out in regroup()
+let groupName = {}, groupPaper = {};
+function nameGroups() {
+  const gs = [...new Set(notes.filter(n => n.vec && n.group >= 0).map(n => n.group))].sort((a, b) => a - b);
+  groupName = groupNames(gs);
+  const themeColor = Object.fromEntries((CONFIG.GROUP_THEMES || []).map(t => [t[0], t[1]]));
+  groupPaper = {};
+  gs.forEach(g => { groupPaper[g] = themeColor[groupName[g]] || CONFIG.MIXED_PAPER || "#dcdcdc"; });
 }
 const hexRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 // like a real coloured sticky note: 1. find the paper's own colour (the brightest 10% of the photo),
@@ -408,6 +418,7 @@ function regroup() {
     n.tx = r * s * Math.cos(th); n.ty = r * u * 0.8; n.tz = r * s * Math.sin(th);
   });
   notes.forEach(addResponseBadges);                       // responses loaded from the server show on the map
+  nameGroups();
   notes.forEach(n => {                                    // a note that changed group gets its new paper colour
     if (!n.__painted || !n.__img || !n.__img.naturalWidth) return;
     const want = paperFor(n);
@@ -441,7 +452,7 @@ function groupNames(groups) {
   };
   groups.forEach(g => {
     const texts = notes.filter(n => n.vec && n.group === g).map(n => n.text);
-    themes.forEach(([name, words], ti) => {
+    themes.forEach(([name, , words], ti) => {
       const hits = texts.filter(t => words.some(w => has(t, w))).length;
       if (hits >= 2 || (hits && hits / texts.length >= 0.5)) cand.push({ g, ti, name, score: hits / texts.length + hits * 0.01 });
     });
@@ -460,8 +471,8 @@ function drawLegend() {
   const counts = {};
   notes.forEach(n => { if (n.vec) { const g = n.group >= 0 ? n.group : -1; counts[g] = (counts[g] || 0) + 1; } });
   const groups = Object.keys(counts).map(Number).filter(g => g >= 0).sort((a, b) => a - b);
-  const sw = n => `<span class="sw" style="background:${paperFor(n) ? "rgb(" + paperFor(n).join() + ")" : "#fde879"}"></span>`;
-  const names = groupNames(groups);
+  const sw = n => paperFor(n) ? `<span class="sw" style="background:rgb(${paperFor(n).join()})"></span>` : `<span class="sw none"></span>`;
+  const names = groupName;
   const strip = groups.concat(counts[-1] ? [-1] : []).map(g => sw({ group: g })).join("");
   el.innerHTML = `<button type="button" class="lgHead" aria-expanded="${el.classList.contains("open")}"><b>Groups by meaning</b><span class="strip">${strip}</span></button>` +
     groups.map(g => `<div class="row" data-g="${g}">${sw({ group: g })}<span>${names[g]}</span><span class="n">${counts[g]}</span></div>`).join("") +
