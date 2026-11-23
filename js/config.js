@@ -66,25 +66,26 @@ export const CONFIG = {
   // (the AI only makes groups, it doesn't name them). A group that matches nothing is called "Mixed".
   // Add or change themes and words freely: [name, [words...]]
   GROUP_THEMES: [
-    //  name                    colour      words
-    ["Becoming better",      "#d7c6f5", ["better", "belong", "laugh", "improve", "person"]],                         // lavender
-    ["Confidence",           "#ffc58c", ["confident", "confidence", "awkward", "shy", "speaker"]],                     // orange
-    ["Family & friends",     "#ffb6d2", ["mom", "mother", "dad", "family", "friend", "friends", "friendship", "sibling", "siblings", "brother", "sister", "bro", "hug"]],   // pink
-    ["Motivation",           "#ff9fa0", ["procrastinate", "motivated", "motivation", "lazy", "push", "passionate", "say no", "start working", "making things"]],          // coral
-    ["Money",                "#b9e89a", ["rich", "money", "billionaire", "earn", "economy", "debt", "debtless", "financial", "$", "nepo"]],                             // green
-    ["Worry & the future",   "#a9dcf7", ["worry", "worrying", "future", "okay", "reassured", "sure", "holds"]],       // blue
-    ["Work & career",        "#e8cfa9", ["job", "jobs", "work", "career", "designer", "h1b", "apple", "paid"]],        // kraft brown
-    ["Happiness",            "#ffd9b0", ["happy", "happily", "happiness", "joy", "live", "life as"]],                 // peach (no yellow: the paper notes are yellow already)
-    ["Sleep & rest",         "#b8c9fa", ["sleep", "rest", "tired", "hours of"]],                                     // periwinkle
-    ["Knowing & meaning",    "#9fe5dc", ["know", "knowing", "answer", "understand", "everything", "what i'm doing"]], // aqua
-    ["Other people",         "#f6b0ea", ["opinions", "people's", "mind", "others", "myself"]],                       // magenta
-    ["Travel & freedom",     "#c4f0fb", ["travel", "world", "alaska", "fly", "free", "astronaut"]],                  // sky
-    ["Time",                 "#e6f39a", ["time", "slow down", "forever", "back in time"]],                           // lime
-    ["Health & body",        "#bff0d4", ["health", "skin", "nicotine", "surgery", "eat"]],                           // mint
-    ["Love",                 "#f7a1b5", ["boyfriend", "girlfriend", "date", "love", "relationship", "laid"]],         // rose
+    //  name (shown in the Key)  colour      words
+    ["Becoming better",   "#b48cf2", ["better", "belong", "laugh", "improve", "person"]],                          // purple
+    ["Family & friends",  "#ff8ec2", ["mom", "mother", "dad", "family", "friend", "friends", "friendship", "sibling", "siblings", "brother", "sister", "bro", "hug"]],   // pink
+    ["Motivation",        "#ffa24c", ["procrastinate", "motivated", "motivation", "lazy", "push", "passionate", "say no", "start working", "making things"]],          // orange
+    ["Money",             "#7fd85a", ["rich", "money", "billionaire", "earn", "economy", "debt", "debtless", "financial", "$", "nepo"]],                             // green
+    ["Worry & future",    "#5fb8f5", ["worry", "worrying", "future", "okay", "reassured", "sure", "holds"]],       // blue
+    ["Career",            "#3fcfbd", ["job", "jobs", "work", "career", "designer", "h1b", "apple", "paid"]],        // teal
+    ["Happiness",         "#ff6b6b", ["happy", "happily", "happiness", "joy", "live", "life as"]],                 // red
+    ["Rest",              "#8a95ff", ["sleep", "rest", "tired", "hours of"]],                                     // indigo
+    ["Other people",      "#e070d8", ["opinions", "people's", "mind", "others", "myself"]],                       // magenta
+    ["Knowledge",         "#c9e43c", ["know", "knowing", "answer", "understand", "everything", "what i'm doing"]], // lime
+    ["Freedom",           "#d8a45c", ["travel", "world", "alaska", "fly", "free", "astronaut"]],                  // kraft gold
+    ["Confidence",        "#4fdc9a", ["confident", "confidence", "awkward", "shy", "speaker"]],                     // mint
+    ["Time",              "#8fb0c2", ["time", "slow down", "forever", "back in time"]],                           // slate
+    ["Health & body",     "#ffbd94", ["health", "skin", "nicotine", "surgery", "eat"]],                           // peach
+    ["Love",              "#d9466a", ["boyfriend", "girlfriend", "date", "love", "relationship", "laid"]],         // raspberry
   ],
-  MIXED_PAPER: "#dcdcdc",  // a group that matches no theme ("Mixed"): light grey
-  TINT: 0.55,             // how strong the colour is (1 = full sticky-note colour, 0 = no colour)
+  UNGROUPED_SWATCH: "#edcea4",  // the "Not grouped" square in the Key (those notes keep their own colour)
+  MIXED_PAPER: "#cfcfcf",  // a group that matches no theme ("Mixed"): light grey
+  TINT: 0.85,             // how strong the colour is (1 = full sticky-note colour, 0 = no colour)
   NOTE_SHADOW: true,      // soft shadow under each note
   NOTE_GAP: 0,            // space between notes (0 = off, 1 = edges touch). Bigger = more spread out
   BG_COLOR: "#ffffff",    // map background (also change body background-color in index.html to match)

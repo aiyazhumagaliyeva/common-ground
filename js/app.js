@@ -471,20 +471,26 @@ function drawLegend() {
   const counts = {};
   notes.forEach(n => { if (n.vec) { const g = n.group >= 0 ? n.group : -1; counts[g] = (counts[g] || 0) + 1; } });
   const groups = Object.keys(counts).map(Number).filter(g => g >= 0).sort((a, b) => a - b);
-  const sw = n => paperFor(n) ? `<span class="sw" style="background:rgb(${paperFor(n).join()})"></span>` : `<span class="sw none"></span>`;
-  const names = groupName;
-  const strip = groups.concat(counts[-1] ? [-1] : []).map(g => sw({ group: g })).join("");
-  el.innerHTML = `<button type="button" class="lgHead" aria-expanded="${el.classList.contains("open")}"><b>Groups by meaning</b><span class="strip">${strip}</span></button>` +
-    groups.map(g => `<div class="row" data-g="${g}">${sw({ group: g })}<span>${names[g]}</span><span class="n">${counts[g]}</span></div>`).join("") +
-    (counts[-1] ? `<div class="row" data-g="-1">${sw({ group: -1 })}<span>Not in a group</span><span class="n">${counts[-1]}</span></div>` : "");
-  el.hidden = !groups.length && !counts[-1];
-  el.querySelectorAll(".row").forEach(row => {           // hover (or tap on a phone) a group: its notes stand out
-    const g = Number(row.dataset.g);
-    row.onmouseenter = () => highlightGroup(g);
-    row.onmouseleave = () => highlightGroup(null);
-    row.onclick = () => highlightGroup(highlighted === g ? null : g);
+  const sw = g => {
+    const p = paperFor({ group: g });
+    return `<span class="sw" style="background:${p ? "rgb(" + p.join() + ")" : (CONFIG.UNGROUPED_SWATCH || "#edcea4")}"></span>`;
+  };
+  const items = groups.map(g => ({ g, name: groupName[g], n: counts[g] }));
+  if (counts[-1]) items.push({ g: -1, name: "Not grouped", n: counts[-1] });
+  const perCol = Math.max(1, Math.ceil(items.length / (phoneView() ? 2 : 3)));   // Figma: 3 columns, filled top to bottom
+  const cols = [];
+  for (let i = 0; i < items.length; i += perCol) cols.push(items.slice(i, i + perCol));
+  el.innerHTML = `<button type="button" class="lgHead" aria-expanded="${el.classList.contains("open")}">Key</button><div class="cols">` +
+    cols.map(c => `<div class="col">` + c.map(it => `<div class="row" data-g="${it.g}">${sw(it.g)}<span class="name">${it.name}</span><span class="n">${it.n}</span></div>`).join("") + `</div>`).join("") + `</div>`;
+  el.hidden = !items.length;
+  el.querySelectorAll(".row > *").forEach(cell => {      // hover (or tap on a phone) a group: its notes stand out
+    const g = Number(cell.parentNode.dataset.g);
+    cell.onmouseenter = () => highlightGroup(g);
+    cell.onmouseleave = () => highlightGroup(null);
+    cell.onclick = () => highlightGroup(highlighted === g ? null : g);
   });
-  el.querySelector(".lgHead").onclick = () => {          // phones: tap to open / close
+  el.onmouseleave = () => highlightGroup(null);
+  el.querySelector(".lgHead").onclick = () => {          // tap / click "Key" to open or close
     el.classList.toggle("open");
     el.querySelector(".lgHead").setAttribute("aria-expanded", el.classList.contains("open"));
   };

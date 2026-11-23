@@ -143,22 +143,26 @@
       transition: bottom 0.45s ease;
     }
     body.page-open #nav { bottom: -80px; }                  /* slides away on pages */
-    /* ---------- COLOUR INDEX (bottom right): one row per group = its colour + how many notes ---------- */
-    #legend { position: fixed; z-index: 3; right: max(16px, calc(36 * var(--k))); bottom: max(16px, calc(36 * var(--k)));
-      font-family: Helvetica, Arial, sans-serif; font-size: 11px; line-height: 1.2; color: #000;
-      background: rgba(255,255,255,0.85); border: 1px solid #000; border-radius: 10px; padding: 7px 9px;
-      display: flex; flex-direction: column; gap: 2px; transition: opacity 0.3s, transform 0.3s; }
+    /* ---------- COLOUR KEY (Figma home04 "Component 1"): a "Key" pill next to the menu; opens into 3 columns ---------- */
+    #legend { position: fixed; z-index: 4; right: max(16px, calc(49 * var(--k))); bottom: max(16px, calc(70 * var(--k)));
+      font-family: Helvetica, Arial, sans-serif; color: #000;
+      background: rgba(255,255,255,0.4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      border: 1px solid #000; border-radius: 20px; padding: max(7px, calc(10 * var(--k))) max(20px, calc(30 * var(--k)));
+      min-width: calc(195 * var(--k)); box-sizing: border-box;
+      display: flex; flex-direction: column; gap: 10px; transition: opacity 0.3s, transform 0.3s; }
     #legend[hidden] { display: none; }
-    #legend .lgHead { all: unset; display: flex; align-items: center; gap: 8px; cursor: default; }
-    #legend b { font-weight: 400; color: rgba(0,0,0,0.55); margin-bottom: 1px; }
-    #legend .strip { display: none; gap: 3px; }
-    #legend .row { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-    #legend .sw { width: 9px; height: 9px; flex: none; box-shadow: 0 1px 2px rgba(0,0,0,0.25); }
-    #legend .row { cursor: pointer; border-radius: 4px; padding: 1px 3px; margin: 0 -3px; transition: opacity 0.2s, background 0.2s; }
-    #legend.focusing .row:not(.on) { opacity: 0.4; }
-    #legend .row.on { background: rgba(0,0,0,0.06); }
-    #legend .sw.none { background: #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); }   /* not in a group: no colour */
-    #legend .n { margin-left: auto; padding-left: 8px; font-variant-numeric: tabular-nums; color: rgba(0,0,0,0.55); }
+    #legend .lgHead { all: unset; cursor: pointer; font-size: max(13px, calc(16 * var(--k))); line-height: 18px; }
+    #legend .cols { display: none; gap: 20px; }
+    #legend.open .cols { display: flex; }
+    @media (hover: hover) { #legend:hover .cols { display: flex; } #legend:hover { background: rgba(255,255,255,0.85); } }
+    #legend.open { background: rgba(255,255,255,0.85); }
+    #legend .col { display: grid; grid-template-columns: 14px auto auto; column-gap: 7px; row-gap: 10px; align-items: center; padding: 10px 0 10px; }
+    #legend .row { display: contents; cursor: pointer; }
+    #legend .row > * { transition: opacity 0.2s; cursor: pointer; }
+    #legend .sw { width: 14px; height: 14px; }
+    #legend .name { font-size: 12px; line-height: 14px; white-space: nowrap; }
+    #legend .n { font-size: 12px; line-height: 14px; padding-left: 3px; text-align: left; font-variant-numeric: tabular-nums; }
+    #legend.focusing .row:not(.on) > * { opacity: 0.3; }
     body.page-open #legend { opacity: 0; transform: translateY(20px); pointer-events: none; }
     #nav .divider { width: 2px; height: max(14px, calc(19 * var(--k))); display: block; }
     #nav button { all: unset; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 7px; }
@@ -289,13 +293,12 @@
       /* Figma phone-home-NEW: name top left (15 / 23, bold 20), the same menu pill at the bottom (40 from the bottom) */
       #brandTop { display: block; left: 15px; top: calc(17px + env(safe-area-inset-top, 0px)); }   /* Figma phone-home-NEW LOGO: 15 / 17, 105 wide */
       #brandTop img { width: 105px; }
-      #legend { right: 12px; bottom: auto; top: calc(20px + env(safe-area-inset-top, 0px)); padding: 7px 9px; gap: 3px; font-size: 11px; border-radius: 10px; }
+      #legend { right: 12px; bottom: auto; top: calc(20px + env(safe-area-inset-top, 0px)); padding: 7px 16px; min-width: 0; gap: 4px; }
+      #legend .lgHead { font-size: 14px; }
+      #legend .cols { gap: 14px; }
+      #legend .col { row-gap: 8px; padding: 6px 0; }
+      #legend .name, #legend .n { font-size: 11px; }
       #legend .sw { width: 11px; height: 11px; }
-      #legend .lgHead { cursor: pointer; flex-direction: column; align-items: flex-start; gap: 5px; }
-      #legend b { margin: 0; }
-      #legend:not(.open) .row { display: none; }        /* phones: folded = a strip of colours, tap to see the list */
-      #legend:not(.open) .strip { display: flex; flex-wrap: wrap; max-width: 110px; }
-      #legend:not(.open) .strip .sw { width: 9px; height: 9px; }
       #nav { display: flex; bottom: calc(40px + env(safe-area-inset-bottom, 0px)); gap: 15px; padding: 10px 20px; border-radius: 40px; font-size: 16px; white-space: nowrap; }
       #nav .camera { width: 20px; }
       #nav .divider { height: 19px; }
