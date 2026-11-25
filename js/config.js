@@ -34,6 +34,10 @@ export const CONFIG = {
   // Smaller sets just sit where their meaning puts them.
   MIN_GROUP_SIZE: 3,
 
+  // A note that's in no group joins the closest group if it's at least this similar to the group's average
+  // (0 = off). Lower = more notes get a colour. Higher = only very clear matches.
+  ATTACH_SIMILARITY: 0.35,
+
   // ---- LAYOUT (3D units) ----
   MAP_RADIUS: 130,        // size of the whole cloud
   GROUP_PULL: 0.3,        // how much notes of one group pull together (0 = none, 1 = tight)
@@ -67,7 +71,7 @@ export const CONFIG = {
   // Add or change themes and words freely: [name, [words...]]
   GROUP_THEMES: [
     //  name (shown in the Key)  colour      words
-    ["Becoming better",   "#b48cf2", ["better", "belong", "laugh", "improve", "person"]],                          // purple
+    ["Becoming better",   "#ffe663", ["better", "belong", "laugh", "improve", "person"]],                          // brand yellow (same as the logo)
     ["Family & friends",  "#ff8ec2", ["mom", "mother", "dad", "family", "friend", "friends", "friendship", "sibling", "siblings", "brother", "sister", "bro", "hug"]],   // pink
     ["Motivation",        "#ffa24c", ["procrastinate", "motivated", "motivation", "lazy", "push", "passionate", "say no", "start working", "making things"]],          // orange
     ["Money",             "#7fd85a", ["rich", "money", "billionaire", "earn", "economy", "debt", "debtless", "financial", "$", "nepo"]],                             // green
@@ -77,15 +81,17 @@ export const CONFIG = {
     ["Rest",              "#8a95ff", ["sleep", "rest", "tired", "hours of"]],                                     // indigo
     ["Other people",      "#e070d8", ["opinions", "people's", "mind", "others", "myself"]],                       // magenta
     ["Knowledge",         "#c9e43c", ["know", "knowing", "answer", "understand", "everything", "what i'm doing"]], // lime
-    ["Freedom",           "#d8a45c", ["travel", "world", "alaska", "fly", "free", "astronaut"]],                  // kraft gold
+    ["Freedom",           "#b48cf2", ["travel", "world", "alaska", "fly", "free", "astronaut"]],                  // purple
     ["Confidence",        "#4fdc9a", ["confident", "confidence", "awkward", "shy", "speaker"]],                     // mint
     ["Time",              "#8fb0c2", ["time", "slow down", "forever", "back in time"]],                           // slate
     ["Health & body",     "#ffbd94", ["health", "skin", "nicotine", "surgery", "eat"]],                           // peach
     ["Love",              "#d9466a", ["boyfriend", "girlfriend", "date", "love", "relationship", "laid"]],         // raspberry
   ],
-  UNGROUPED_SWATCH: "#edcea4",  // the "Not grouped" square in the Key (those notes keep their own colour)
+  // notes in no group: shown as photographed. Notes someone coloured themselves (before colour = theme)
+  // go back to plain sticky-note paper, so their old colour doesn't look like a theme
+  UNGROUPED_PAPER: "#f4e6a6",
   MIXED_PAPER: "#cfcfcf",  // a group that matches no theme ("Mixed"): light grey
-  TINT: 0.85,             // how strong the colour is (1 = full sticky-note colour, 0 = no colour)
+  TINT: 0.55,             // how strong the colour is (1 = full sticky-note colour, 0 = no colour)
   NOTE_SHADOW: true,      // soft shadow under each note
   NOTE_GAP: 0,            // space between notes (0 = off, 1 = edges touch). Bigger = more spread out
   BG_COLOR: "#ffffff",    // map background (also change body background-color in index.html to match)

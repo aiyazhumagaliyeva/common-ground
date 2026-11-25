@@ -160,6 +160,8 @@
     #legend .row { display: contents; cursor: pointer; }
     #legend .row > * { transition: opacity 0.2s; cursor: pointer; }
     #legend .sw { width: 14px; height: 14px; }
+    #legend .sw.none { background: #fff; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.4); }   /* not grouped: no colour */
+    #legend .row.picked .name { text-decoration: underline; }   /* the theme you clicked (camera is on it) */
     #legend .name { font-size: 12px; line-height: 14px; white-space: nowrap; }
     #legend .n { font-size: 12px; line-height: 14px; padding-left: 3px; text-align: left; font-variant-numeric: tabular-nums; }
     #legend.focusing .row:not(.on) > * { opacity: 0.3; }

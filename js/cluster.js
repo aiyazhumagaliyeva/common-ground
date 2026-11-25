@@ -145,6 +145,17 @@ export function layout(notes) {
                     .sort((a, b) => b.length - a.length);
   notes.forEach(n => (n.group = -1));                  // -1 = not in a group
   groups.forEach((g, gi) => g.forEach(i => (notes[i].group = gi)));
+  // second step: a note left on its own joins the closest group when its meaning is close enough
+  // (ATTACH_SIMILARITY; 0 = off). The groups themselves don't change, so the order notes came in still doesn't matter.
+  if (CONFIG.ATTACH_SIMILARITY && groups.length) {
+    const centres = groups.map(g => { const m = mean(g.map(i => E[i])); return scale(m, 1 / norm(m)); });
+    notes.forEach((n, i) => {
+      if (n.group >= 0) return;
+      let best = -1, bg = -1;
+      centres.forEach((c, gi) => { const s = dot(E[i], c); if (s > best) { best = s; bg = gi; } });
+      if (best >= CONFIG.ATTACH_SIMILARITY) n.group = bg;
+    });
+  }
 
   // --- one continuous cloud, like TensorFlow ---
   // Every note sits where its own meaning puts it (PCA), not on a group island.

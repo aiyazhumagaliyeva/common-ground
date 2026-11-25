@@ -88,7 +88,9 @@ function paintNote(n) {
 // Each group gets one real sticky-note colour; notes that aren't in a group are classic yellow.
 // Groups are numbered biggest first, so the biggest group always gets the first colour.
 function paperFor(n) {
-  if (!CONFIG.GROUP_COLORS || n.group == null || n.group < 0) return null;   // not in a group: no colour
+  if (!CONFIG.GROUP_COLORS) return null;
+  if (n.group == null || n.group < 0)                    // not in a group: as photographed, except notes someone coloured
+    return n.color ? hexRGB(CONFIG.UNGROUPED_PAPER || "#f4e6a6") : null;   // themselves (they go back to plain paper)
   const hex = groupPaper[n.group];
   if (!hex) return null;
   const t = CONFIG.TINT ?? 0.55;                           // soften: mix the sticky-note colour with white
@@ -335,7 +337,7 @@ const _off = new THREE.Vector3(), _axis = new THREE.Vector3(), _q = new THREE.Qu
 function glide() {
   const cam = graph.camera(), t = controls.target, now = performance.now();
   // the drift comes back after a few seconds without touching (not while a note or a page is open)
-  if (!controls.autoRotate && CONFIG.DRIFT_SPEED > 0 && $("tour").hidden && !selected && now - lastTouch > (CONFIG.DRIFT_RESUME ?? 4000)
+  if (!controls.autoRotate && CONFIG.DRIFT_SPEED > 0 && $("tour").hidden && !selected && focusedGroup === null && now - lastTouch > (CONFIG.DRIFT_RESUME ?? 4000)
       && !document.body.classList.contains("page-open")) { controls.autoRotate = true; controls.autoRotateSpeed = CONFIG.DRIFT_SPEED; }
   const arriving = notes.some(n => n.__arriving);            // a new note is flying in: hold still
   if (arriving) lastTouch = now;
@@ -428,6 +430,31 @@ function regroup() {
   animateToTargets();
 }
 
+// click a theme in the Key: the camera turns and moves in so that theme fills the view; it stays highlighted.
+// Click it again (or anywhere on the map) to go back.
+let focusedGroup = null;
+function focusGroup(g) {
+  focusedGroup = g;
+  highlightGroup(g);
+  document.querySelectorAll("#legend .row").forEach(r => r.classList.toggle("picked", Number(r.dataset.g) === g));
+  touched();
+  if (g === null) return;
+  const members = notes.filter(n => n.vec && (g === -1 ? !(n.group >= 0) : n.group === g) && n.tx !== undefined);
+  if (!members.length) return;
+  const c = new THREE.Vector3();
+  members.forEach(n => c.add(new THREE.Vector3(n.tx, n.ty, n.tz)));
+  c.divideScalar(members.length);
+  const r = Math.max(CONFIG.NOTE_SIZE, ...members.map(n => c.distanceTo(new THREE.Vector3(n.tx, n.ty, n.tz)))) + CONFIG.NOTE_SIZE;
+  const cam = graph.camera();
+  const fov = (cam.fov * Math.PI) / 180, aspect = innerWidth / innerHeight;
+  const fit = r / Math.tan(fov / 2) / Math.min(1, aspect);   // far enough for the whole theme to fit
+  const dir = c.length() > 1 ? c.clone().normalize() : cam.position.clone().normalize();
+  // the camera sits on the line from the map's center through the theme, so the theme is in the middle
+  // and the map still turns around its own center afterwards
+  const p = dir.multiplyScalar(c.length() + Math.max(60, fit * 1.15));
+  graph.cameraPosition({ x: p.x, y: p.y, z: p.z }, { x: 0, y: 0, z: 0 }, 1300);
+}
+
 // highlight one group's notes: the others fade back (null = show all)
 let highlighted = null;
 function highlightGroup(g) {
@@ -472,8 +499,9 @@ function drawLegend() {
   notes.forEach(n => { if (n.vec) { const g = n.group >= 0 ? n.group : -1; counts[g] = (counts[g] || 0) + 1; } });
   const groups = Object.keys(counts).map(Number).filter(g => g >= 0).sort((a, b) => a - b);
   const sw = g => {
+    if (g < 0) return `<span class="sw none"></span>`;   // not grouped: no colour (white square)
     const p = paperFor({ group: g });
-    return `<span class="sw" style="background:${p ? "rgb(" + p.join() + ")" : (CONFIG.UNGROUPED_SWATCH || "#edcea4")}"></span>`;
+    return `<span class="sw" style="background:rgb(${p.join()})"></span>`;
   };
   const items = groups.map(g => ({ g, name: groupName[g], n: counts[g] }));
   if (counts[-1]) items.push({ g: -1, name: "Not grouped", n: counts[-1] });
@@ -486,10 +514,11 @@ function drawLegend() {
   el.querySelectorAll(".row > *").forEach(cell => {      // hover (or tap on a phone) a group: its notes stand out
     const g = Number(cell.parentNode.dataset.g);
     cell.onmouseenter = () => highlightGroup(g);
-    cell.onmouseleave = () => highlightGroup(null);
-    cell.onclick = () => highlightGroup(highlighted === g ? null : g);
+    cell.onmouseleave = () => highlightGroup(focusedGroup);
+    cell.onclick = () => focusGroup(focusedGroup === g ? null : g);
   });
-  el.onmouseleave = () => highlightGroup(null);
+  el.onmouseleave = () => highlightGroup(focusedGroup);
+  el.querySelectorAll(".row").forEach(r => r.classList.toggle("picked", Number(r.dataset.g) === focusedGroup));
   el.querySelector(".lgHead").onclick = () => {          // tap / click "Key" to open or close
     el.classList.toggle("open");
     el.querySelector(".lgHead").setAttribute("aria-expanded", el.classList.contains("open"));
@@ -591,7 +620,9 @@ $("map").addEventListener("pointerup", e => {
   if (!p || p.id !== e.pointerId || p.button !== 0) return;
   const moved = Math.hypot(e.clientX - p.x, e.clientY - p.y), limit = e.pointerType === "mouse" ? 8 : 12;
   if (moved > limit || performance.now() - p.t > 700) return;       // that was a drag (moving / turning), not a click
-  p.note ? openNote(p.note) : closeNote();
+  if (p.note) return openNote(p.note);
+  if (focusedGroup !== null && !selected) focusGroup(null);        // clicking empty space leaves the theme view
+  closeNote();
 });
 
 // research: which notes people stop on (hovered at least 1 second). Clarity can't see inside the 3D map,
